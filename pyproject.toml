@@ -1,0 +1,9 @@
+[project]
+name = "frequency-domain-watermarking"
+version = "0.1.0"
+description = "Frequency-domain image watermarking experiments for DFT, DCT, and DWT."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -36,12 +36,12 @@
 | 阶段 | 状态 | 内容 | 产出 |
 |---|---|---|---|
 | Phase 1 | complete | 阅读作业要求，初始化本地 Git 仓库 | `.git/`、规划文件 |
-| Phase 2 | pending | 搭建 Python 项目结构 | `src/`、`experiments/`、`outputs/`、`README.md`、`requirements.txt` |
-| Phase 3 | pending | 准备数据集与示例图像 | 原图、水印图、数据说明 |
-| Phase 4 | pending | 实现 DFT 水印嵌入与提取 | 可运行基础算法 |
-| Phase 5 | pending | 实现质量评估与可视化 | PSNR/SSIM/NC/BER、频谱图、对比图 |
-| Phase 6 | pending | 实现攻击测试 | JPEG、缩放、加噪实验结果 |
-| Phase 7 | pending | 可选 DCT/DWT 或盲水印增强 | 加分算法模块 |
+| Phase 2 | complete | 搭建 Python 项目结构 | `src/`、`experiments/`、`outputs/`、`README.md`、`requirements.txt` |
+| Phase 3 | complete | 准备数据集与示例图像 | 原图、水印图、数据说明 |
+| Phase 4 | complete | 实现 DFT 水印嵌入与提取 | 可运行基础算法 |
+| Phase 5 | complete | 实现质量评估与可视化 | PSNR/SSIM/NC/BER、频谱图、对比图 |
+| Phase 6 | complete | 实现攻击测试 | JPEG、缩放、加噪实验结果 |
+| Phase 7 | complete | 可选 DCT/DWT 或盲水印增强 | 加分算法模块 |
 | Phase 8 | pending | 编写报告、PPT、最终打包 | 报告、答辩 PPT、提交压缩包 |
 
 ## 建议项目结构

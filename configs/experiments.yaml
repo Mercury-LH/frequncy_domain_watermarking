@@ -1,0 +1,33 @@
+dataset:
+  image: data/raw/lena.png
+  watermark: data/watermark/logo.png
+  image_size: [512, 512]
+
+output:
+  root: outputs
+
+methods:
+  dft:
+    alpha: 10.0
+    watermark_size: [64, 64]
+    radius_ratio: 0.28
+  dct:
+    delta: 12.0
+    block_size: 8
+    watermark_size: [32, 32]
+    coeff_pair: [[3, 4], [4, 3]]
+  dwt:
+    alpha: 0.05
+    wavelet: haar
+    subband: hl
+    watermark_size: [64, 64]
+
+experiments:
+  methods: [dft, dct, dwt]
+  strengths:
+    dft: [2, 5, 10, 20, 40]
+    dct: [2, 5, 10, 20, 40]
+    dwt: [0.01, 0.03, 0.05, 0.1]
+  jpeg_qualities: [90, 70, 50, 30]
+  noise_sigmas: [5, 10, 20]
+  scale_factors: [0.5, 0.75, 1.5]
