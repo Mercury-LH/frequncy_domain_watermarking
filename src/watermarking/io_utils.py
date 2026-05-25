@@ -17,12 +17,42 @@ def read_grayscale(path: str | Path) -> np.ndarray:
     return image
 
 
-def save_grayscale(path: str | Path, image: np.ndarray) -> None:
+def read_color(path: str | Path) -> np.ndarray:
+    image_path = Path(path)
+    if not image_path.exists():
+        raise FileNotFoundError(f"Image not found: {image_path}. Put the file there or run demo data preparation.")
+    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError(f"Failed to read image as color: {image_path}.")
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+
+def luminance_channel(image: np.ndarray) -> np.ndarray:
+    if image.ndim == 2:
+        return image
+    return cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)[:, :, 0]
+
+
+def replace_luminance(image: np.ndarray, luminance: np.ndarray) -> np.ndarray:
+    if image.ndim == 2:
+        return luminance
+    ycrcb = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
+    ycrcb[:, :, 0] = np.clip(luminance, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
+
+
+def save_image(path: str | Path, image: np.ndarray) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    if image.ndim == 3:
+        image = cv2.cvtColor(np.clip(image, 0, 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
     ok = cv2.imwrite(str(output_path), np.clip(image, 0, 255).astype(np.uint8))
     if not ok:
         raise ValueError(f"Failed to save image: {output_path}.")
+
+
+def save_grayscale(path: str | Path, image: np.ndarray) -> None:
+    save_image(path, image)
 
 
 def prepare_watermark(watermark: np.ndarray, shape: tuple[int, int]) -> np.ndarray:

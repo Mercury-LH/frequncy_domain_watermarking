@@ -8,26 +8,33 @@
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python experiments/run_all.py
+PYTHONPATH=.:src python3 experiments/run_all.py
 ```
 
-如果公开数据下载失败，程序会生成可运行的示例图像和水印；也可以手动将测试图放入 `data/raw/`，将水印图放入 `data/watermark/`。
+默认实验会使用多张测试图，包含 `data/misc/` 中的灰度图和 `data/misc/`、`data/images/test/` 中的彩色图；灰度图直接进行频域水印处理，彩色图会通过 YCrCb 颜色空间的 Y 通道接口保留彩色外观。也可以手动将测试图放入 `data/raw/` 或在 `configs/experiments.yaml` 中继续添加图片。
 
 ## 一键运行
 
 ```bash
-python experiments/run_basic.py
-python experiments/run_strength.py
-python experiments/run_attacks.py
-python experiments/run_all.py
+PYTHONPATH=.:src python3 experiments/run_basic.py
+PYTHONPATH=.:src python3 experiments/run_strength.py
+PYTHONPATH=.:src python3 experiments/run_attacks.py
+PYTHONPATH=.:src python3 experiments/run_all.py
 ```
 
 ## 命令行演示
 
 ```bash
-python main.py embed --method dft --image data/raw/lena.png --watermark data/watermark/logo.png --output outputs/demo/dft_watermarked.png
-python main.py extract --method dft --image outputs/demo/dft_watermarked.png --original data/raw/lena.png --output outputs/demo/dft_extracted.png
-python main.py attack --type jpeg --quality 50 --image outputs/demo/dft_watermarked.png --output outputs/demo/dft_jpeg50.png
+PYTHONPATH=.:src python3 main.py embed --method dft --image data/misc/boat.512.tiff --watermark data/watermark/logo.png --output outputs/demo/dft_watermarked.png
+PYTHONPATH=.:src python3 main.py extract --method dft --image outputs/demo/dft_watermarked.png --original data/misc/boat.512.tiff --output outputs/demo/dft_extracted.png
+PYTHONPATH=.:src python3 main.py attack --type jpeg --quality 50 --image outputs/demo/dft_watermarked.png --output outputs/demo/dft_jpeg50.png
+```
+
+彩色图像建议使用 Y 通道接口，例如：
+
+```bash
+PYTHONPATH=.:src python3 main.py embed --method dct --color-y --image data/images/test/101085.jpg --watermark data/watermark/logo.png --output outputs/demo/bsd_color_y_dct_watermarked.png
+PYTHONPATH=.:src python3 main.py extract --method dct --color-y --image outputs/demo/bsd_color_y_dct_watermarked.png --output outputs/demo/bsd_color_y_dct_extracted.png
 ```
 
 ## 算法说明
@@ -35,6 +42,7 @@ python main.py attack --type jpeg --quality 50 --image outputs/demo/dft_watermar
 - DFT：非盲水印算法，在傅里叶频谱中频区域嵌入水印，提取时需要原始图像。
 - DCT：盲水印算法，以 `8x8` 图像块中频 DCT 系数对的大小关系表示水印 bit。
 - DWT：小波域水印算法，在 `LH/HL/HH` 子带中嵌入水印，展示多分辨率频域方法。
+- 彩色 Y 通道接口：彩色图像转换到 YCrCb 空间，仅在亮度通道 Y 上执行 DFT/DCT/DWT 水印处理，再与色度通道合成为彩色含水印图。
 
 ## 进阶实验
 
@@ -46,11 +54,14 @@ python main.py attack --type jpeg --quality 50 --image outputs/demo/dft_watermar
 
 ## 结果输出
 
-结果默认保存在 `outputs/`：
+结果默认保存在 `outputs/multi_image/`，旧的 `outputs/basic/`、`outputs/strength/`、`outputs/attacks/` 不会被脚本主动删除：
 
-- `outputs/basic/`：基础嵌入、提取和对比图。
-- `outputs/strength/`：强度实验 CSV 和曲线图。
-- `outputs/attacks/`：抗攻击实验 CSV 和对比图。
+- `outputs/multi_image/basic/<image_name>/`：每张图的基础嵌入、提取、频谱和对比图。
+- `outputs/multi_image/basic/metrics_basic_all.csv`：所有图片的基础实验汇总指标。
+- `outputs/multi_image/strength/<image_name>/`：每张图的强度实验 CSV 和曲线图。
+- `outputs/multi_image/strength/metrics_strength_all.csv`：所有图片的强度实验汇总指标。
+- `outputs/multi_image/attacks/<image_name>/`：每张图的抗攻击结果、CSV 和曲线图。
+- `outputs/multi_image/attacks/metrics_attacks_all.csv`：所有图片的抗攻击实验汇总指标。
 
 ## 依赖
 

@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 import yaml
 
 from watermarking.attacks import apply_attack
-from watermarking.io_utils import prepare_watermark, read_grayscale, save_grayscale
+from watermarking.io_utils import luminance_channel, prepare_watermark, read_color, read_grayscale, replace_luminance, save_grayscale, save_image
 from watermarking.registry import create_watermarker, list_methods
 
 
@@ -28,13 +28,15 @@ def command_embed(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     params = method_params(config, args.method)
     params.update(args.param or {})
-    image = read_grayscale(args.image)
+    display_image = read_color(args.image) if args.color_y else read_grayscale(args.image)
+    image = luminance_channel(display_image)
     watermark = read_grayscale(args.watermark)
     shape = tuple(params.pop("watermark_size", watermark.shape))
     prepared = prepare_watermark(watermark, (int(shape[0]), int(shape[1])))
     watermarker = create_watermarker(args.method, **params)
     result = watermarker.embed(image, prepared)
-    save_grayscale(args.output, result.image)
+    output_image = replace_luminance(display_image, result.image) if args.color_y else result.image
+    save_image(args.output, output_image)
     print(f"Saved watermarked image to {args.output}")
 
 
@@ -42,8 +44,9 @@ def command_extract(args: argparse.Namespace) -> None:
     config = load_config(args.config)
     params = method_params(config, args.method)
     shape = tuple(params.pop("watermark_size", args.watermark_size))
-    image = read_grayscale(args.image)
-    original = read_grayscale(args.original) if args.original else None
+    display_image = read_color(args.image) if args.color_y else read_grayscale(args.image)
+    image = luminance_channel(display_image)
+    original = luminance_channel(read_color(args.original)) if args.original and args.color_y else read_grayscale(args.original) if args.original else None
     watermarker = create_watermarker(args.method, **params)
     result = watermarker.extract(image, (int(shape[0]), int(shape[1])), original_image=original)
     save_grayscale(args.output, result.watermark)
@@ -68,6 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     embed.add_argument("--watermark", required=True)
     embed.add_argument("--output", required=True)
     embed.add_argument("--config", default="configs/experiments.yaml")
+    embed.add_argument("--color-y", action="store_true", help="preserve color by embedding in the Y channel")
     embed.set_defaults(func=command_embed, param={})
 
     extract = subparsers.add_parser("extract")
@@ -77,6 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     extract.add_argument("--output", required=True)
     extract.add_argument("--watermark-size", nargs=2, type=int, default=(64, 64))
     extract.add_argument("--config", default="configs/experiments.yaml")
+    extract.add_argument("--color-y", action="store_true", help="extract from the Y channel of a color image")
     extract.set_defaults(func=command_extract)
 
     attack = subparsers.add_parser("attack")

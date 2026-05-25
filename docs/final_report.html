@@ -1,0 +1,1346 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+@page { size: A4; margin: 22mm 20mm; }
+body { font-family: "Songti SC", "SimSun", "PingFang SC", "Hiragino Sans GB", serif; line-height: 1.7; color: #111; font-size: 12pt; }
+h1 { text-align: left; font-size: 19pt; margin-top: 22px; page-break-after: avoid; }
+h2 { font-size: 15pt; margin-top: 18px; page-break-after: avoid; }
+h3 { font-size: 13pt; margin-top: 15px; page-break-after: avoid; }
+p { text-align: justify; margin: 7px 0; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 9.8pt; page-break-inside: avoid; }
+th, td { border: 1px solid #888; padding: 4px 6px; vertical-align: top; }
+th { background: #f2f2f2; font-weight: bold; }
+img { max-width: 82%; max-height: 118mm; display: block; margin: 7px auto 3px auto; page-break-inside: avoid; }
+pre { background: #f7f7f7; border: 1px solid #ddd; padding: 7px 9px; overflow-wrap: break-word; white-space: pre-wrap; font-size: 8.8pt; line-height: 1.28; page-break-inside: avoid; }
+code { font-family: Menlo, Consolas, "Courier New", monospace; font-size: 0.9em; }
+ul, ol { margin-top: 5px; margin-bottom: 8px; }
+li { margin: 2px 0; }
+hr { border: none; border-top: 1px solid #aaa; margin: 16px 0; }
+</style>
+</head>
+<body>
+<div style="text-align:center; margin-top: 80px; margin-bottom: 80px;">
+
+# 图像频域水印实现报告
+
+第 5 题：图像频域水印  
+信号与系统大作业
+
+组员：侯治民、乔义杰、金灏、王师睿  
+代码仓库：https://github.com/Mercury-LH/frequncy_domain_watermarking  
+日期：2026 年 5 月
+
+</div>
+
+<hr />
+<h1>1 引言</h1>
+<h2>1.1 数字水印的背景</h2>
+<p>随着数字图像、音频、视频等多媒体数据在网络中的大量传播，数字内容的版权保护、完整性验证和来源追踪变得越来越重要。数字水印技术就是在这种背景下产生的一类信息隐藏方法。它通过在原始媒体中嵌入某种标识信息，使得该信息在正常观看时不明显，但在需要时可以通过算法提取出来，用于证明版权、检测篡改或追踪传播来源。</p>
+<p>图像数字水印通常需要同时满足以下几个目标：</p>
+<ul>
+<li><strong>不可见性</strong>：水印嵌入后，含水印图像与原始图像在视觉上应尽量接近，不能明显破坏图像质量。</li>
+<li><strong>可提取性</strong>：接收端或验证端能够从含水印图像中提取出嵌入的水印信息。</li>
+<li><strong>鲁棒性</strong>：图像经过 JPEG 压缩、缩放、噪声干扰等常见处理后，水印仍尽量可以恢复。</li>
+<li><strong>安全性</strong>：攻击者在不知道嵌入参数或嵌入规则的情况下，不容易去除或伪造水印。</li>
+<li><strong>可扩展性</strong>：算法应能处理不同图像、不同水印尺寸，并能通过参数调整控制图像质量和水印强度。</li>
+</ul>
+<p>本次大作业题目为“图像频域水印”。与直接修改像素的空间域方法相比，频域水印先将图像从空间域变换到频域或变换域，再对频率系数进行修改。由于图像压缩、滤波等操作本身也常在频域或变换域中体现，因此频域水印通常比简单空间域水印更适合分析不可见性与鲁棒性之间的关系。</p>
+<h2>1.2 频域水印的基本思想</h2>
+<p>图像可以看作二维离散信号。对于一幅灰度图像，像素矩阵可以表示为：</p>
+<pre><code class="language-text">I(x, y), 0 &lt;= x &lt; H, 0 &lt;= y &lt; W
+</code></pre>
+<p>其中 <code>H</code> 和 <code>W</code> 分别表示图像高度和宽度。频域水印的基本流程可以概括为：</p>
+<pre><code class="language-text">原始图像 I
+→ 频域变换 T(I)
+→ 修改特定频率系数
+→ 逆变换 T^-1
+→ 含水印图像 Iw
+</code></pre>
+<p>在频域中，低频系数通常对应图像整体亮度和大结构，高频系数通常对应边缘、纹理和噪声。若直接修改低频，水印鲁棒性可能较强，但图像容易出现明显失真；若只修改高频，水印更不容易被肉眼察觉，但容易被压缩或滤波破坏。因此很多频域水印方法会选择中频区域作为嵌入位置，在不可见性和鲁棒性之间取得折中。</p>
+<p>本项目实现了三种典型变换域方法：</p>
+<ol>
+<li><strong>DFT（Discrete Fourier Transform）</strong>：直接对整幅图像做二维傅里叶变换，在频谱中频位置嵌入水印。</li>
+<li><strong>DCT（Discrete Cosine Transform）</strong>：将图像划分为多个 8×8 小块，在每个块的中频 DCT 系数中嵌入 bit，作为主要盲水印方案。</li>
+<li><strong>DWT（Discrete Wavelet Transform）</strong>：将图像分解为多个小波子带，在指定子带中嵌入水印，作为小波域扩展方法。</li>
+</ol>
+<h2>1.3 作业任务与目标</h2>
+<p>根据课堂 PPT/作业说明《20260428 信号与系统 大作业说明.pdf》，题目5“图像频域水印”的要求可分为基础、进阶和挑战三部分。</p>
+<h3>1.3.1 基础任务</h3>
+<p>基础任务要求：</p>
+<ul>
+<li>对图像进行 DFT 或类似频域变换。</li>
+<li>在频域特定位置嵌入不可见数字水印。</li>
+<li>通过逆变换得到含水印图像。</li>
+<li>从含水印图像中提取原始水印。</li>
+<li>验证水印不可见性。</li>
+</ul>
+<p>本项目通过 DFT 频域水印实现基础任务。DFT 方法在傅里叶频谱中选择中频位置对称嵌入水印，提取时利用原图和含水印图像的频谱差异恢复水印。</p>
+<h3>1.3.2 进阶任务</h3>
+<p>进阶任务要求：</p>
+<ul>
+<li>分析嵌入强度对图像质量的影响。</li>
+<li>测试水印在 JPEG 压缩、缩放、加噪等操作后的抗攻击能力。</li>
+</ul>
+<p>本项目分别编写了强度实验脚本和抗攻击实验脚本。强度实验扫描不同嵌入参数，统计 PSNR、SSIM、BER 等指标；抗攻击实验模拟 JPEG 压缩、高斯噪声和缩放攻击，分析攻击后水印提取质量。</p>
+<h3>1.3.3 挑战任务</h3>
+<p>挑战任务要求：</p>
+<ul>
+<li>尝试 DCT 或 DWT 域水印。</li>
+<li>设计盲水印算法，使提取水印时不需要原始图像。</li>
+</ul>
+<p>本项目实现了 DCT 盲水印算法。该算法通过 8×8 图像块中两个中频 DCT 系数的大小关系编码水印 bit，提取时只需要含水印图像，不需要原始图像。同时项目还实现了 DWT 小波域水印作为扩展方案。</p>
+<h2>1.4 本项目完成内容概述</h2>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>要求</th>
+<th>完成情况</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>基础</td>
+<td>DFT 或类似频域变换</td>
+<td>已实现 DFT、DCT、DWT 三种变换域方法</td>
+</tr>
+<tr>
+<td>基础</td>
+<td>频域嵌入不可见水印</td>
+<td>DFT 中频对称嵌入；DCT 中频系数对嵌入；DWT 子带嵌入</td>
+</tr>
+<tr>
+<td>基础</td>
+<td>逆变换得到含水印图像</td>
+<td>分别使用 IDFT、IDCT、IDWT 重建</td>
+</tr>
+<tr>
+<td>基础</td>
+<td>提取原始水印</td>
+<td>DFT 非盲提取；DCT 盲提取；DWT 扩展提取</td>
+</tr>
+<tr>
+<td>基础</td>
+<td>不可见性验证</td>
+<td>输出 MSE、PSNR、SSIM 指标</td>
+</tr>
+<tr>
+<td>进阶</td>
+<td>嵌入强度分析</td>
+<td>输出强度-PSNR 和强度-BER 曲线</td>
+</tr>
+<tr>
+<td>进阶</td>
+<td>抗攻击测试</td>
+<td>测试 JPEG、噪声、缩放攻击</td>
+</tr>
+<tr>
+<td>挑战</td>
+<td>DCT/DWT 水印</td>
+<td>已实现 DCT 和 DWT</td>
+</tr>
+<tr>
+<td>挑战</td>
+<td>盲水印</td>
+<td>DCT 提取时不需要原图</td>
+</tr>
+<tr>
+<td>扩展</td>
+<td>多图实验</td>
+<td>使用 4 张灰度图和 6 张彩色图</td>
+</tr>
+<tr>
+<td>扩展</td>
+<td>彩色图处理</td>
+<td>增加 Y 通道频域水印接口，输出保留彩色</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1>2 系统结构与实验环境</h1>
+<h2>2.1 项目目录结构</h2>
+<p>项目采用模块化结构组织代码，使算法实现、实验流程、指标计算和可视化输出相互独立。整体目录如下：</p>
+<pre><code class="language-text">frequncy_domain_watermarking/
+├── configs/
+│   └── experiments.yaml          # 数据集、算法参数和实验参数
+├── data/
+│   ├── images/                   # BSD 彩色图像
+│   ├── misc/                     # USC-SIPI 灰度和彩色图像
+│   ├── raw/                      # 可选原始图像目录
+│   └── watermark/
+│       └── logo.png              # HJQ 水印图
+├── docs/
+│   ├── manual/                   # 使用手册 Markdown/PDF
+│   ├── final_report.md           # 本报告源文件
+│   └── final_report.pdf          # 本报告 PDF
+├── experiments/
+│   ├── common.py                 # 实验公共工具
+│   ├── run_basic.py              # 基础实验
+│   ├── run_strength.py           # 强度实验
+│   ├── run_attacks.py            # 抗攻击实验
+│   └── run_all.py                # 一键运行全部实验
+├── outputs/
+│   └── multi_image/              # 多图实验输出结果
+├── src/
+│   └── watermarking/
+│       ├── algorithms/
+│       │   ├── base.py           # 抽象基类与公共转换函数
+│       │   ├── dft.py            # DFT 水印算法
+│       │   ├── dct.py            # DCT 盲水印算法
+│       │   └── dwt.py            # DWT 水印算法
+│       ├── attacks.py            # JPEG、缩放、噪声等攻击
+│       ├── io_utils.py           # 图像读写、Y 通道处理
+│       ├── metrics.py            # 图像质量和水印质量指标
+│       ├── registry.py           # 算法注册表
+│       └── visualization.py      # 图像与曲线可视化
+├── tests/                        # pytest 自动化测试
+├── main.py                       # 命令行接口
+├── README.md
+├── requirements.txt
+└── pyproject.toml
+</code></pre>
+<p>这种结构的优点是：</p>
+<ul>
+<li>算法之间相互独立，DFT、DCT、DWT 可以单独测试和替换。</li>
+<li>实验脚本不直接依赖某个具体算法类，而是通过注册表创建算法对象。</li>
+<li>指标计算和图像保存独立封装，方便在不同实验中复用。</li>
+<li>配置文件集中管理实验参数，便于修改数据集、嵌入强度和攻击强度。</li>
+</ul>
+<h2>2.2 运行环境与依赖</h2>
+<p>项目主要使用 Python 实现，依赖如下：</p>
+<table>
+<thead>
+<tr>
+<th>依赖</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>numpy</td>
+<td>矩阵计算、FFT、数值处理</td>
+</tr>
+<tr>
+<td>opencv-python</td>
+<td>图像读写、DCT、颜色空间转换</td>
+</tr>
+<tr>
+<td>scipy</td>
+<td>科学计算辅助</td>
+</tr>
+<tr>
+<td>scikit-image</td>
+<td>SSIM 指标计算</td>
+</tr>
+<tr>
+<td>matplotlib</td>
+<td>绘制对比图、频谱图和曲线</td>
+</tr>
+<tr>
+<td>PyWavelets</td>
+<td>DWT 小波变换</td>
+</tr>
+<tr>
+<td>PyYAML</td>
+<td>读取实验配置文件</td>
+</tr>
+<tr>
+<td>pandas</td>
+<td>保存和处理 CSV 指标数据</td>
+</tr>
+<tr>
+<td>requests</td>
+<td>自动下载示例图像</td>
+</tr>
+<tr>
+<td>pytest</td>
+<td>自动化测试</td>
+</tr>
+</tbody>
+</table>
+<p>安装依赖命令：</p>
+<pre><code class="language-bash">python3 -m pip install -r requirements.txt
+</code></pre>
+<p>运行全部测试命令：</p>
+<pre><code class="language-bash">python3 -m pytest -v
+</code></pre>
+<h2>2.3 实验配置文件</h2>
+<p>所有实验的核心参数写在 <code>configs/experiments.yaml</code> 中。配置文件中同时保留单图字段和多图列表，既兼容单次命令行使用，也支持批量实验。</p>
+<pre><code class="language-yaml">dataset:
+  image: data/misc/boat.512.tiff
+  watermark: data/watermark/logo.png
+  image_size: [512, 512]
+  images:
+    - name: boat_gray
+      path: data/misc/boat.512.tiff
+      source_type: gray
+    - name: gray21_gray
+      path: data/misc/gray21.512.tiff
+      source_type: gray
+    - name: house_color
+      path: data/misc/house.tiff
+      source_type: color
+    - name: bsd_color
+      path: data/images/test/101085.jpg
+      source_type: color
+</code></pre>
+<p>算法参数示例：</p>
+<pre><code class="language-yaml">methods:
+  dft:
+    alpha: 10.0
+    watermark_size: [64, 64]
+    radius_ratio: 0.28
+  dct:
+    delta: 12.0
+    block_size: 8
+    watermark_size: [32, 32]
+    coeff_pair: [[3, 4], [4, 3]]
+  dwt:
+    alpha: 0.05
+    wavelet: haar
+    subband: hl
+    watermark_size: [64, 64]
+</code></pre>
+<p>实验参数示例：</p>
+<pre><code class="language-yaml">experiments:
+  methods: [dft, dct, dwt]
+  strengths:
+    dft: [2, 5, 10, 20, 40]
+    dct: [2, 5, 10, 20, 40]
+    dwt: [0.01, 0.03, 0.05, 0.1]
+  jpeg_qualities: [90, 70, 50, 30]
+  noise_sigmas: [5, 10, 20]
+  scale_factors: [0.5, 0.75, 1.5]
+</code></pre>
+<h2>2.4 数据集与水印图</h2>
+<p>本实验使用 10 张测试图像，包括 4 张灰度图和 6 张彩色图。</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th style="text-align: right;">数量</th>
+<th>图像名称</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>灰度图</td>
+<td style="text-align: right;">4</td>
+<td><code>boat_gray</code>、<code>gray21_gray</code>、<code>texture_gray</code>、<code>pattern_gray</code></td>
+</tr>
+<tr>
+<td>彩色图</td>
+<td style="text-align: right;">6</td>
+<td><code>house_color</code>、<code>airplane_color</code>、<code>bsd_color</code>、<code>bsd_landscape_color</code>、<code>bsd_train_color</code>、<code>bsd_texture_color</code></td>
+</tr>
+</tbody>
+</table>
+<p>水印图为 <code>data/watermark/logo.png</code>，内容为 <code>HJQ</code>。在实验中，水印会根据不同算法的容量被缩放和二值化。例如 DFT 和 DWT 默认使用 <code>64×64</code> 水印，DCT 默认使用 <code>32×32</code> 水印，因为 DCT 每个 8×8 块通常只嵌入一个 bit。</p>
+<hr />
+<h1>3 基础任务：DFT 频域水印</h1>
+<h2>3.1 任务问题</h2>
+<p>基础任务要求在图像频域中嵌入不可见水印，并能从含水印图像中提取出原始水印。这里选择二维 DFT 作为基础算法。对于二维图像 <code>f(x, y)</code>，其二维离散傅里叶变换可以写为：</p>
+<pre><code class="language-text">F(u, v) = Σx Σy f(x, y) · exp(-j2π(ux/M + vy/N))
+</code></pre>
+<p>逆变换为：</p>
+<pre><code class="language-text">f(x, y) = 1/(MN) · Σu Σv F(u, v) · exp(j2π(ux/M + vy/N))
+</code></pre>
+<p>在实现中，使用 <code>np.fft.fft2</code> 计算二维 DFT，使用 <code>np.fft.ifft2</code> 进行逆变换。为了便于选择频谱中心附近的中频区域，还使用 <code>np.fft.fftshift</code> 将低频移动到频谱中心。</p>
+<h2>3.2 原理分析</h2>
+<p>DFT 频域水印的核心思想是将二值水印映射为频谱中的微小扰动。设水印 bit 为 <code>0/1</code>，先将其转换为符号：</p>
+<pre><code class="language-text">bit = 1 → +1
+bit = 0 → -1
+</code></pre>
+<p>然后在频谱中选取一组中频位置 <code>(u, v)</code>，按如下方式修改：</p>
+<pre><code class="language-text">F'(u, v) = F(u, v) + α · s
+</code></pre>
+<p>其中 <code>α</code> 是嵌入强度，<code>s</code> 是由水印 bit 转换得到的 <code>+1/-1</code> 符号。为了保证逆变换后结果主要为实数，需要在频谱的对称位置同时嵌入相同扰动。</p>
+<p>本项目的 DFT 算法属于非盲水印算法。提取时需要原始图像，先计算含水印图像和原图的差值，再对差值做 DFT：</p>
+<pre><code class="language-text">D = FFT(Iw - I)
+</code></pre>
+<p>如果某个嵌入位置的差值频谱实部为正，则恢复 bit 为 1；否则恢复 bit 为 0。</p>
+<h2>3.3 算法设计与实现</h2>
+<p>DFT 水印嵌入流程：</p>
+<pre><code class="language-text">1. 读取原始图像并转换为灰度亮度矩阵。
+2. 将水印缩放并二值化。
+3. 对原始图像执行二维 FFT。
+4. 将频谱中心移动到图像中心。
+5. 选择中频嵌入位置。
+6. 将水印 bit 映射为 +1/-1 并写入频谱。
+7. 在对称频率位置同步写入，保持频谱对称性。
+8. 执行逆 FFT 得到含水印图像。
+</code></pre>
+<p>核心代码如下：</p>
+<pre><code class="language-python">def embed(self, image: np.ndarray, watermark: np.ndarray) -&gt; WatermarkResult:
+    host = ensure_grayscale_float(image)
+    bits = watermark_to_bits(watermark)
+    signs = bits.astype(np.float64) * 2 - 1
+    spectrum = np.fft.fftshift(np.fft.fft2(host))
+    positions = self._positions(host.shape, bits.shape)
+    flat_signs = signs.ravel()
+    height, width = host.shape
+    strength = self.alpha * height * width / 32.0
+    for idx, (y, x) in enumerate(positions):
+        spectrum[y, x] += strength * flat_signs[idx]
+        spectrum[(height - y) % height, (width - x) % width] += strength * flat_signs[idx]
+    watermarked = np.fft.ifft2(np.fft.ifftshift(spectrum)).real
+    return WatermarkResult(
+        image=normalize_uint8(watermarked),
+        watermark=np.where(bits &gt; 0, 255, 0).astype(np.uint8),
+        metadata={&quot;method&quot;: self.method_name, &quot;alpha&quot;: self.alpha, &quot;blind&quot;: False},
+    )
+</code></pre>
+<p>DFT 水印提取代码如下：</p>
+<pre><code class="language-python">def extract(self, image, watermark_shape, original_image=None):
+    if original_image is None:
+        raise ValueError(&quot;DFT extraction requires original_image because this is a non-blind baseline.&quot;)
+    watermarked = ensure_grayscale_float(image)
+    original = ensure_grayscale_float(original_image)
+    difference = np.fft.fftshift(np.fft.fft2(watermarked - original))
+    positions = self._positions(watermarked.shape, watermark_shape)
+    bits = np.array(
+        [1 if difference[y, x].real &gt;= 0 else 0 for y, x in positions],
+        dtype=np.uint8,
+    )
+    watermark = (bits.reshape(watermark_shape) * 255).astype(np.uint8)
+    return ExtractionResult(watermark=watermark, metadata={&quot;method&quot;: self.method_name, &quot;blind&quot;: False})
+</code></pre>
+<h2>3.4 运行结果与分析</h2>
+<p>灰度图 <code>boat_gray</code> 上的 DFT 结果如下。图中依次展示原图、含水印图、差异图、原始水印和提取水印。</p>
+<p><img alt="Figure 1: boat_gray DFT 对比结果" src="../outputs/multi_image/basic/boat_gray/dft_comparison.png" /></p>
+<p>对应频谱图如下：</p>
+<p><img alt="Figure 2: boat_gray DFT 频谱图" src="../outputs/multi_image/basic/boat_gray/dft_spectrum.png" /></p>
+<p>另一张灰度图 <code>gray21_gray</code> 的 DFT 结果如下：</p>
+<p><img alt="Figure 3: gray21_gray DFT 对比结果" src="../outputs/multi_image/basic/gray21_gray/dft_comparison.png" /></p>
+<p>彩色图 <code>house_color</code> 通过 Y 通道进行 DFT 水印处理，输出仍保持彩色：</p>
+<p><img alt="Figure 4: house_color DFT 对比结果" src="../outputs/multi_image/basic/house_color/dft_comparison.png" /></p>
+<p>从图中可以看到，含水印图像和原图整体接近，差异图主要显示水印嵌入带来的细微变化。DFT 提取出的水印能够看到 <code>HJQ</code> 结构，说明基础任务中的频域嵌入和提取流程已经实现。</p>
+<hr />
+<h1>4 挑战任务一：DCT 盲水印算法</h1>
+<h2>4.1 任务问题</h2>
+<p>挑战任务要求尝试 DCT 或 DWT 域水印，并设计盲水印算法。盲水印的关键要求是：提取水印时不依赖原始图像。为了满足这一点，本项目将 DCT 作为主要盲水印算法。</p>
+<p>DCT 广泛用于图像压缩，尤其是 JPEG 标准。图像被划分为 8×8 小块后，每个块可以通过 DCT 转换为 64 个频率系数。左上角对应低频，右下角对应高频，中间区域为中频。</p>
+<h2>4.2 原理分析</h2>
+<p>二维 DCT 可表示为：</p>
+<pre><code class="language-text">C(u, v) = α(u)α(v) Σx Σy f(x, y)
+          cos((2x+1)uπ/2N) cos((2y+1)vπ/2N)
+</code></pre>
+<p>其中 <code>C(u, v)</code> 为 DCT 系数。DCT 盲水印的关键不是记录某个绝对系数值，而是记录两个系数之间的相对大小关系。设选择两个中频系数 <code>c1</code> 和 <code>c2</code>：</p>
+<pre><code class="language-text">bit = 1: c1 &gt; c2
+bit = 0: c1 &lt; c2
+</code></pre>
+<p>提取时，只需要对含水印图像重新分块并执行 DCT，再比较同一对系数大小即可恢复 bit。这种方法不需要原始图像，因此属于盲水印算法。</p>
+<h2>4.3 算法设计与实现</h2>
+<p>DCT 盲水印嵌入流程：</p>
+<pre><code class="language-text">1. 将图像转换为灰度或 Y 通道亮度矩阵。
+2. 将图像按 8×8 分块。
+3. 对每个块执行 DCT。
+4. 取两个中频系数 c1=(3,4), c2=(4,3)。
+5. 若要嵌入 bit=1，则调整为 c1 &gt; c2。
+6. 若要嵌入 bit=0，则调整为 c1 &lt; c2。
+7. 对修改后的块执行 IDCT。
+8. 拼接所有块得到含水印图像。
+</code></pre>
+<p>核心代码如下：</p>
+<pre><code class="language-python">def embed(self, image: np.ndarray, watermark: np.ndarray) -&gt; WatermarkResult:
+    host = ensure_grayscale_float(image).copy()
+    bits = watermark_to_bits(watermark).ravel()
+    if bits.size &gt; self._capacity(host.shape):
+        raise ValueError(f&quot;Watermark has {bits.size} bits but DCT capacity is {self._capacity(host.shape)} bits.&quot;)
+    c1, c2 = self.coeff_pair
+    for bit, (y, x, block) in zip(bits, self._iter_blocks(host)):
+        dct_block = cv2.dct(block.astype(np.float32))
+        a = dct_block[c1]
+        b = dct_block[c2]
+        midpoint = (a + b) / 2.0
+        if bit == 1:
+            dct_block[c1] = midpoint + self.delta / 2.0
+            dct_block[c2] = midpoint - self.delta / 2.0
+        else:
+            dct_block[c1] = midpoint - self.delta / 2.0
+            dct_block[c2] = midpoint + self.delta / 2.0
+        host[y : y + self.block_size, x : x + self.block_size] = cv2.idct(dct_block)
+    return WatermarkResult(
+        image=normalize_uint8(host),
+        watermark=(bits.reshape(watermark.shape) * 255).astype(np.uint8),
+        metadata={&quot;method&quot;: self.method_name, &quot;delta&quot;: self.delta, &quot;blind&quot;: True},
+    )
+</code></pre>
+<p>提取流程更简单，只比较两个系数大小：</p>
+<pre><code class="language-python">def extract(self, image: np.ndarray, watermark_shape: tuple[int, int], original_image=None):
+    host = ensure_grayscale_float(image)
+    total_bits = int(np.prod(watermark_shape))
+    c1, c2 = self.coeff_pair
+    bits: list[int] = []
+    for _, _, block in self._iter_blocks(host):
+        dct_block = cv2.dct(block.astype(np.float32))
+        bits.append(1 if dct_block[c1] &gt; dct_block[c2] else 0)
+        if len(bits) == total_bits:
+            break
+    watermark = (np.array(bits, dtype=np.uint8).reshape(watermark_shape) * 255).astype(np.uint8)
+    return ExtractionResult(watermark=watermark, metadata={&quot;method&quot;: self.method_name, &quot;blind&quot;: True})
+</code></pre>
+<h2>4.4 运行结果与分析</h2>
+<p>灰度图 <code>boat_gray</code> 的 DCT 盲水印结果如下：</p>
+<p><img alt="Figure 5: boat_gray DCT 盲水印结果" src="../outputs/multi_image/basic/boat_gray/dct_comparison.png" /></p>
+<p>对应 DCT 频谱可视化如下：</p>
+<p><img alt="Figure 6: boat_gray DCT 频谱图" src="../outputs/multi_image/basic/boat_gray/dct_spectrum.png" /></p>
+<p>彩色图 <code>house_color</code> 的 DCT 盲水印结果如下：</p>
+<p><img alt="Figure 7: house_color DCT 盲水印结果" src="../outputs/multi_image/basic/house_color/dct_comparison.png" /></p>
+<p>BSD 彩色图 <code>bsd_color</code> 的 DCT 盲水印结果如下：</p>
+<p><img alt="Figure 8: bsd_color DCT 盲水印结果" src="../outputs/multi_image/basic/bsd_color/dct_comparison.png" /></p>
+<p>从实验图可以看到，DCT 方法的差异图整体较弱，含水印图与原图肉眼接近；同时提取水印中 <code>HJQ</code> 字样比较清楚。基础实验中 DCT 方法平均 PSNR 达到约 <code>47.541 dB</code>，平均 BER 约为 <code>0.0014</code>，说明它在不可见性和水印恢复准确率之间表现较好。</p>
+<hr />
+<h1>5 挑战任务二：DWT 小波域扩展</h1>
+<h2>5.1 原理分析</h2>
+<p>DWT（离散小波变换）是一种多分辨率分析方法。对图像进行一级二维小波分解后，可以得到四个子带：</p>
+<table>
+<thead>
+<tr>
+<th>子带</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LL</td>
+<td>低频近似部分，包含图像主要结构</td>
+</tr>
+<tr>
+<td>LH</td>
+<td>水平方向细节</td>
+</tr>
+<tr>
+<td>HL</td>
+<td>垂直方向细节</td>
+</tr>
+<tr>
+<td>HH</td>
+<td>对角高频细节</td>
+</tr>
+</tbody>
+</table>
+<p>DWT 水印的思想是在某个细节子带中叠加水印信息。相比 DFT，DWT 同时具有频率局部性和空间局部性；相比 DCT，DWT 不依赖固定 8×8 分块，适合展示多尺度频域水印方法。</p>
+<h2>5.2 算法流程</h2>
+<pre><code class="language-text">原始图像
+→ 一级 DWT 分解
+→ 得到 LL、LH、HL、HH 子带
+→ 在指定子带中嵌入水印
+→ IDWT 重建图像
+→ 得到含水印图像
+</code></pre>
+<p>DWT 嵌入的关键步骤是将水印二值化为 <code>+1/-1</code> 符号，再叠加到指定子带的前若干位置中。默认配置中使用 <code>haar</code> 小波和 <code>HL</code> 子带。</p>
+<h2>5.3 实验结果</h2>
+<p>灰度图 <code>boat_gray</code> 的 DWT 结果如下：</p>
+<p><img alt="Figure 9: boat_gray DWT 水印结果" src="../outputs/multi_image/basic/boat_gray/dwt_comparison.png" /></p>
+<p>彩色图 <code>airplane_color</code> 的 DWT 结果如下：</p>
+<p><img alt="Figure 10: airplane_color DWT 水印结果" src="../outputs/multi_image/basic/airplane_color/dwt_comparison.png" /></p>
+<p>BSD 纹理图 <code>bsd_texture_color</code> 的 DWT 结果如下：</p>
+<p><img alt="Figure 11: bsd_texture_color DWT 水印结果" src="../outputs/multi_image/basic/bsd_texture_color/dwt_comparison.png" /></p>
+<p>DWT 方法在当前实验中主要用于展示小波域水印思想。由于默认嵌入强度较低，图像失真很小，因此 PSNR 和 SSIM 指标较高。报告中将 DWT 作为挑战部分的扩展算法，而将 DCT 作为主要盲水印算法。</p>
+<hr />
+<h1>6 彩色图像 Y 通道水印接口</h1>
+<h2>6.1 问题来源</h2>
+<p>在初始实验中，如果直接用 OpenCV 的灰度读取方式处理彩色图，输出图像会丢失颜色。这虽然可以完成频域水印算法验证，但不利于展示真实彩色图像场景。为了让彩色图像输出仍保持彩色，本项目增加了 Y 通道频域水印接口。</p>
+<h2>6.2 原理分析</h2>
+<p>RGB 图像可以转换到 YCrCb 颜色空间，其中：</p>
+<ul>
+<li><code>Y</code> 表示亮度信息。</li>
+<li><code>Cr</code> 和 <code>Cb</code> 表示色度信息。</li>
+</ul>
+<p>人眼对亮度变化更敏感，但大多数图像结构也主要体现在亮度通道中。因此，在 Y 通道嵌入水印可以保持算法的二维矩阵处理方式，同时保留彩色图像的色度信息。</p>
+<p>Y 通道处理流程如下：</p>
+<pre><code class="language-text">RGB 彩色图像
+→ 转换到 YCrCb
+→ 提取 Y 亮度通道
+→ 在 Y 通道执行 DFT/DCT/DWT 水印
+→ 用修改后的 Y 替换原 Y
+→ 保留原 Cr/Cb 通道
+→ 转回 RGB 彩色图像
+</code></pre>
+<h2>6.3 代码实现</h2>
+<p>图像读取和 Y 通道替换代码如下：</p>
+<pre><code class="language-python">def read_color(path: str | Path) -&gt; np.ndarray:
+    image_path = Path(path)
+    if not image_path.exists():
+        raise FileNotFoundError(f&quot;Image not found: {image_path}. Put the file there or run demo data preparation.&quot;)
+    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError(f&quot;Failed to read image as color: {image_path}.&quot;)
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+
+def luminance_channel(image: np.ndarray) -&gt; np.ndarray:
+    if image.ndim == 2:
+        return image
+    return cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)[:, :, 0]
+
+
+def replace_luminance(image: np.ndarray, luminance: np.ndarray) -&gt; np.ndarray:
+    if image.ndim == 2:
+        return luminance
+    ycrcb = cv2.cvtColor(image, cv2.COLOR_RGB2YCrCb)
+    ycrcb[:, :, 0] = np.clip(luminance, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
+</code></pre>
+<p>命令行使用示例：</p>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 main.py embed \
+  --method dct \
+  --color-y \
+  --image data/images/test/101085.jpg \
+  --watermark data/watermark/logo.png \
+  --output outputs/demo/bsd_color_y_dct_watermarked.png
+</code></pre>
+<h2>6.4 彩色实验结果</h2>
+<p><code>house_color</code> 上的 DCT 结果如下：</p>
+<p><img alt="Figure 12: house_color 彩色 Y 通道 DCT 结果" src="../outputs/multi_image/basic/house_color/dct_comparison.png" /></p>
+<p><code>bsd_train_color</code> 上的 DFT 结果如下：</p>
+<p><img alt="Figure 13: bsd_train_color 彩色 Y 通道 DFT 结果" src="../outputs/multi_image/basic/bsd_train_color/dft_comparison.png" /></p>
+<p><code>bsd_landscape_color</code> 上的 DWT 结果如下：</p>
+<p><img alt="Figure 14: bsd_landscape_color 彩色 Y 通道 DWT 结果" src="../outputs/multi_image/basic/bsd_landscape_color/dwt_comparison.png" /></p>
+<p>从这些结果可以看出，彩色图像经过水印处理后仍保留颜色，说明 Y 通道接口解决了彩色图被灰度化的问题。</p>
+<hr />
+<h1>7 评价指标设计</h1>
+<h2>7.1 图像质量指标</h2>
+<p>为了验证水印不可见性，本项目使用 MSE、PSNR 和 SSIM 三个指标。</p>
+<h3>7.1.1 MSE</h3>
+<p>MSE 表示原图和含水印图像之间的均方误差：</p>
+<pre><code class="language-text">MSE = 1/(MN) · Σx Σy [I(x,y) - Iw(x,y)]²
+</code></pre>
+<p>MSE 越小，说明两幅图像越接近。</p>
+<h3>7.1.2 PSNR</h3>
+<p>PSNR 表示峰值信噪比：</p>
+<pre><code class="language-text">PSNR = 10 · log10(MAX² / MSE)
+</code></pre>
+<p>其中 <code>MAX=255</code>。PSNR 越高，说明图像失真越小。一般情况下：</p>
+<table>
+<thead>
+<tr>
+<th>PSNR</th>
+<th>图像质量说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&gt; 40 dB</td>
+<td>失真很小</td>
+</tr>
+<tr>
+<td>30-40 dB</td>
+<td>质量较好</td>
+</tr>
+<tr>
+<td>20-30 dB</td>
+<td>有一定失真</td>
+</tr>
+<tr>
+<td>&lt; 20 dB</td>
+<td>失真较明显</td>
+</tr>
+</tbody>
+</table>
+<h3>7.1.3 SSIM</h3>
+<p>SSIM 衡量结构相似性，范围通常在 0 到 1 之间，越接近 1 表示图像结构越相似。</p>
+<h2>7.2 水印质量指标</h2>
+<p>水印提取质量通过 NC 和 BER 衡量。</p>
+<h3>7.2.1 NC</h3>
+<p>NC 是归一化相关系数，用于衡量原始水印和提取水印之间的相关程度：</p>
+<pre><code class="language-text">NC = &lt;W, W'&gt; / (||W|| · ||W'||)
+</code></pre>
+<p>NC 越接近 1，表示提取水印越接近原水印。</p>
+<h3>7.2.2 BER</h3>
+<p>BER 表示 bit 错误率：</p>
+<pre><code class="language-text">BER = 错误 bit 数 / 总 bit 数
+</code></pre>
+<p>BER 越低，说明水印提取越准确。</p>
+<h2>7.3 指标计算代码</h2>
+<pre><code class="language-python">def mse(reference: np.ndarray, candidate: np.ndarray) -&gt; float:
+    ref, cand = _same_shape(reference, candidate)
+    return float(np.mean((ref - cand) ** 2))
+
+
+def psnr(reference: np.ndarray, candidate: np.ndarray, data_range: float = 255.0) -&gt; float:
+    error = mse(reference, candidate)
+    if error == 0:
+        return math.inf
+    return float(10 * math.log10((data_range**2) / error))
+
+
+def bit_error_rate(reference: np.ndarray, candidate: np.ndarray) -&gt; float:
+    ref, cand = _same_shape(_bits(reference), _bits(candidate))
+    return float(np.mean(ref != cand))
+</code></pre>
+<hr />
+<h1>8 基础实验结果汇总</h1>
+<h2>8.1 输出目录</h2>
+<p>基础实验输出目录为：</p>
+<pre><code class="language-text">outputs/multi_image/basic/
+├── boat_gray/
+├── gray21_gray/
+├── texture_gray/
+├── pattern_gray/
+├── house_color/
+├── airplane_color/
+├── bsd_color/
+├── bsd_landscape_color/
+├── bsd_train_color/
+└── bsd_texture_color/
+</code></pre>
+<p>每张图像目录中包含：</p>
+<pre><code class="language-text">dft_watermarked.png
+dft_extracted.png
+dft_comparison.png
+dft_spectrum.png
+
+dct_watermarked.png
+dct_extracted.png
+dct_comparison.png
+dct_spectrum.png
+
+dwt_watermarked.png
+dwt_extracted.png
+dwt_comparison.png
+dwt_spectrum.png
+
+metrics_basic.csv
+</code></pre>
+<h2>8.2 平均指标</h2>
+<p>基础实验的聚合指标文件为：</p>
+<pre><code class="language-text">outputs/multi_image/basic/metrics_basic_all.csv
+</code></pre>
+<p>三种算法的平均指标如下：</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>mse</th>
+<th>psnr</th>
+<th>ssim</th>
+<th>nc</th>
+<th>ber</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dct</td>
+<td>1.6081</td>
+<td>47.541</td>
+<td>0.9957</td>
+<td>0.9973</td>
+<td>0.0014</td>
+</tr>
+<tr>
+<td>dft</td>
+<td>261.8546</td>
+<td>24.1322</td>
+<td>0.7517</td>
+<td>0.9236</td>
+<td>0.0382</td>
+</tr>
+<tr>
+<td>dwt</td>
+<td>0.03</td>
+<td>inf</td>
+<td>0.9999</td>
+<td>1.0</td>
+<td>0.0</td>
+</tr>
+</tbody>
+</table>
+<h2>8.3 多图实验结果展示</h2>
+<p>灰度纹理图 DFT 结果：</p>
+<p><img alt="Figure 15: texture_gray DFT 结果" src="../outputs/multi_image/basic/texture_gray/dft_comparison.png" /></p>
+<p>灰度 pattern 图 DCT 结果：</p>
+<p><img alt="Figure 16: pattern_gray DCT 结果" src="../outputs/multi_image/basic/pattern_gray/dct_comparison.png" /></p>
+<p>彩色 airplane 图 DCT 结果：</p>
+<p><img alt="Figure 17: airplane_color DCT 结果" src="../outputs/multi_image/basic/airplane_color/dct_comparison.png" /></p>
+<p>BSD train 彩色图 DCT 结果：</p>
+<p><img alt="Figure 18: bsd_train_color DCT 结果" src="../outputs/multi_image/basic/bsd_train_color/dct_comparison.png" /></p>
+<p>BSD texture 彩色图 DFT 结果：</p>
+<p><img alt="Figure 19: bsd_texture_color DFT 结果" src="../outputs/multi_image/basic/bsd_texture_color/dft_comparison.png" /></p>
+<p>从多图实验可以看到，不同图像纹理复杂程度会影响水印效果。纹理较复杂的图像中，水印扰动更容易被图像本身的纹理掩盖；平滑区域较多的图像中，差异图可能更明显。彩色图通过 Y 通道嵌入后，整体颜色仍然保留。</p>
+<hr />
+<h1>9 进阶任务一：嵌入强度实验</h1>
+<h2>9.1 任务问题</h2>
+<p>嵌入强度是水印算法中最重要的参数之一。强度过低时，水印对图像影响小，但提取时容易出错；强度过高时，水印更容易提取，但图像失真也会增加。因此，需要通过实验分析强度对图像质量和提取准确率的影响。</p>
+<h2>9.2 实验设计</h2>
+<p>强度实验对三种算法分别设置不同扫描范围：</p>
+<pre><code class="language-yaml">strengths:
+  dft: [2, 5, 10, 20, 40]
+  dct: [2, 5, 10, 20, 40]
+  dwt: [0.01, 0.03, 0.05, 0.1]
+</code></pre>
+<p>运行脚本：</p>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 experiments/run_strength.py
+</code></pre>
+<p>核心实验代码如下：</p>
+<pre><code class="language-python">for method in selected_methods:
+    for value in sweep[method]:
+        params = dict(config[&quot;methods&quot;][method])
+        watermark_size = tuple(params.pop(&quot;watermark_size&quot;))
+        params[_strength_key(method)] = value
+        watermark = prepare_watermark(watermark_source, watermark_size)
+        watermarker = create_watermarker(method, **params)
+        embedded = watermarker.embed(image, watermark)
+        extracted = watermarker.extract(
+            embedded.image,
+            watermark.shape,
+            original_image=image if method == &quot;dft&quot; else None,
+        )
+</code></pre>
+<h2>9.3 总体曲线</h2>
+<p>强度与 PSNR 的关系如下：</p>
+<p><img alt="Figure 20: 所有图像强度-PSNR 曲线" src="../outputs/multi_image/strength/strength_psnr_all.png" /></p>
+<p>强度与 BER 的关系如下：</p>
+<p><img alt="Figure 21: 所有图像强度-BER 曲线" src="../outputs/multi_image/strength/strength_ber_all.png" /></p>
+<h2>9.4 单图曲线展示</h2>
+<p><code>boat_gray</code> 强度实验：</p>
+<p><img alt="Figure 22: boat_gray 强度-PSNR 曲线" src="../outputs/multi_image/strength/boat_gray/strength_psnr.png" /></p>
+<p><img alt="Figure 23: boat_gray 强度-BER 曲线" src="../outputs/multi_image/strength/boat_gray/strength_ber.png" /></p>
+<p><code>house_color</code> 强度实验：</p>
+<p><img alt="Figure 24: house_color 强度-PSNR 曲线" src="../outputs/multi_image/strength/house_color/strength_psnr.png" /></p>
+<p><img alt="Figure 25: house_color 强度-BER 曲线" src="../outputs/multi_image/strength/house_color/strength_ber.png" /></p>
+<h2>9.5 数据分析</h2>
+<p>DFT 强度实验平均结果：</p>
+<table>
+<thead>
+<tr>
+<th>strength</th>
+<th>psnr</th>
+<th>ber</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2.0</td>
+<td>35.053</td>
+<td>0.0365</td>
+</tr>
+<tr>
+<td>5.0</td>
+<td>28.9068</td>
+<td>0.0365</td>
+</tr>
+<tr>
+<td>10.0</td>
+<td>24.1322</td>
+<td>0.0382</td>
+</tr>
+<tr>
+<td>20.0</td>
+<td>19.6326</td>
+<td>0.0506</td>
+</tr>
+<tr>
+<td>40.0</td>
+<td>15.6902</td>
+<td>0.1127</td>
+</tr>
+</tbody>
+</table>
+<p>DCT 强度实验平均结果：</p>
+<table>
+<thead>
+<tr>
+<th>strength</th>
+<th>psnr</th>
+<th>ber</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2.0</td>
+<td>inf</td>
+<td>0.1482</td>
+</tr>
+<tr>
+<td>5.0</td>
+<td>49.7319</td>
+<td>0.0036</td>
+</tr>
+<tr>
+<td>10.0</td>
+<td>48.1555</td>
+<td>0.0017</td>
+</tr>
+<tr>
+<td>20.0</td>
+<td>45.2405</td>
+<td>0.0012</td>
+</tr>
+<tr>
+<td>40.0</td>
+<td>40.7824</td>
+<td>0.0007</td>
+</tr>
+</tbody>
+</table>
+<p>可以看到 DCT 方法最符合预期规律：当 <code>delta=2</code> 时，图像几乎没有失真，但 BER 较高；当 <code>delta</code> 提高到 5 或 10 时，BER 快速下降，而 PSNR 仍保持较高；当 <code>delta=40</code> 时，BER 进一步降低，但 PSNR 下降到约 40.78 dB。综合考虑不可见性和提取准确率，默认 <code>delta=12</code> 是较合理的折中。</p>
+<hr />
+<h1>10 进阶任务二：抗攻击实验</h1>
+<h2>10.1 任务问题</h2>
+<p>图像在实际传播中常常会经历压缩、缩放、加噪等处理。抗攻击实验的目标是观察水印在这些处理后是否仍能被提取。</p>
+<p>本项目测试三类攻击：</p>
+<table>
+<thead>
+<tr>
+<th>攻击类型</th>
+<th>参数</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>JPEG</td>
+<td>90、70、50、30</td>
+<td>质量因子越低，压缩越强</td>
+</tr>
+<tr>
+<td>noise</td>
+<td>5、10、20</td>
+<td>高斯噪声标准差越大，噪声越强</td>
+</tr>
+<tr>
+<td>resize</td>
+<td>0.5、0.75、1.5</td>
+<td>先缩放再恢复原尺寸</td>
+</tr>
+</tbody>
+</table>
+<h2>10.2 攻击代码实现</h2>
+<p>攻击实验会先嵌入水印，再对含水印图像施加攻击，最后从攻击后的图像中提取水印。</p>
+<pre><code class="language-python">attacks = []
+attacks += [(&quot;jpeg&quot;, q, jpeg_compress(embedded.image, q)) for q in qualities]
+attacks += [(&quot;noise&quot;, s, gaussian_noise(embedded.image, s)) for s in sigmas]
+attacks += [(&quot;resize&quot;, s, resize_attack(embedded.image, s)) for s in scales]
+for attack_name, level, attacked in attacks:
+    extracted = watermarker.extract(
+        attacked,
+        watermark.shape,
+        original_image=image if method == &quot;dft&quot; else None,
+    )
+</code></pre>
+<h2>10.3 总体攻击结果</h2>
+<p>所有图像的 BER 曲线如下：</p>
+<p><img alt="Figure 26: 所有图像抗攻击 BER 曲线" src="../outputs/multi_image/attacks/attack_ber_all.png" /></p>
+<p><code>boat_gray</code> 单图攻击结果：</p>
+<p><img alt="Figure 27: boat_gray 抗攻击 BER 曲线" src="../outputs/multi_image/attacks/boat_gray/attack_ber.png" /></p>
+<p><code>house_color</code> 单图攻击结果：</p>
+<p><img alt="Figure 28: house_color 抗攻击 BER 曲线" src="../outputs/multi_image/attacks/house_color/attack_ber.png" /></p>
+<h2>10.4 攻击图像示例</h2>
+<p>JPEG 质量为 30 的攻击图像示例：</p>
+<p><img alt="Figure 29: boat_gray DFT JPEG 30 攻击" src="../outputs/multi_image/attacks/boat_gray/dft_jpeg_30_attacked.png" /></p>
+<p>高斯噪声 sigma=20 的攻击图像示例：</p>
+<p><img alt="Figure 30: boat_gray DFT noise 20 攻击" src="../outputs/multi_image/attacks/boat_gray/dft_noise_20_attacked.png" /></p>
+<p>缩放比例 0.5 的攻击图像示例：</p>
+<p><img alt="Figure 31: boat_gray DFT resize 0.5 攻击" src="../outputs/multi_image/attacks/boat_gray/dft_resize_0.5_attacked.png" /></p>
+<p>彩色图 JPEG 攻击示例：</p>
+<p><img alt="Figure 32: bsd_color DCT JPEG 30 攻击" src="../outputs/multi_image/attacks/bsd_color/dct_jpeg_30_attacked.png" /></p>
+<p>彩色图噪声攻击示例：</p>
+<p><img alt="Figure 33: bsd_color DCT noise 20 攻击" src="../outputs/multi_image/attacks/bsd_color/dct_noise_20_attacked.png" /></p>
+<h2>10.5 数据分析</h2>
+<p>JPEG 攻击平均结果：</p>
+<table>
+<thead>
+<tr>
+<th>attack</th>
+<th>level</th>
+<th>method</th>
+<th>ber</th>
+<th>nc</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>jpeg</td>
+<td>30.0</td>
+<td>dct</td>
+<td>0.372</td>
+<td>0.2561</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>30.0</td>
+<td>dft</td>
+<td>0.0469</td>
+<td>0.9061</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>50.0</td>
+<td>dct</td>
+<td>0.3971</td>
+<td>0.2059</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>50.0</td>
+<td>dft</td>
+<td>0.0406</td>
+<td>0.9188</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>70.0</td>
+<td>dct</td>
+<td>0.3793</td>
+<td>0.2414</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>70.0</td>
+<td>dft</td>
+<td>0.0389</td>
+<td>0.9223</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>90.0</td>
+<td>dct</td>
+<td>0.0071</td>
+<td>0.9857</td>
+</tr>
+<tr>
+<td>jpeg</td>
+<td>90.0</td>
+<td>dft</td>
+<td>0.0383</td>
+<td>0.9235</td>
+</tr>
+</tbody>
+</table>
+<p>噪声攻击平均结果：</p>
+<table>
+<thead>
+<tr>
+<th>attack</th>
+<th>level</th>
+<th>method</th>
+<th>ber</th>
+<th>nc</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>noise</td>
+<td>5.0</td>
+<td>dct</td>
+<td>0.0552</td>
+<td>0.8896</td>
+</tr>
+<tr>
+<td>noise</td>
+<td>5.0</td>
+<td>dft</td>
+<td>0.0384</td>
+<td>0.9232</td>
+</tr>
+<tr>
+<td>noise</td>
+<td>10.0</td>
+<td>dct</td>
+<td>0.2134</td>
+<td>0.5732</td>
+</tr>
+<tr>
+<td>noise</td>
+<td>10.0</td>
+<td>dft</td>
+<td>0.0404</td>
+<td>0.9192</td>
+</tr>
+<tr>
+<td>noise</td>
+<td>20.0</td>
+<td>dct</td>
+<td>0.3478</td>
+<td>0.3045</td>
+</tr>
+<tr>
+<td>noise</td>
+<td>20.0</td>
+<td>dft</td>
+<td>0.0576</td>
+<td>0.8849</td>
+</tr>
+</tbody>
+</table>
+<p>缩放攻击平均结果：</p>
+<table>
+<thead>
+<tr>
+<th>attack</th>
+<th>level</th>
+<th>method</th>
+<th>ber</th>
+<th>nc</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>resize</td>
+<td>0.5</td>
+<td>dct</td>
+<td>0.3816</td>
+<td>0.2367</td>
+</tr>
+<tr>
+<td>resize</td>
+<td>0.5</td>
+<td>dft</td>
+<td>0.1672</td>
+<td>0.6655</td>
+</tr>
+<tr>
+<td>resize</td>
+<td>0.75</td>
+<td>dct</td>
+<td>0.0542</td>
+<td>0.8916</td>
+</tr>
+<tr>
+<td>resize</td>
+<td>0.75</td>
+<td>dft</td>
+<td>0.0553</td>
+<td>0.8894</td>
+</tr>
+<tr>
+<td>resize</td>
+<td>1.5</td>
+<td>dct</td>
+<td>0.0118</td>
+<td>0.9764</td>
+</tr>
+<tr>
+<td>resize</td>
+<td>1.5</td>
+<td>dft</td>
+<td>0.039</td>
+<td>0.922</td>
+</tr>
+</tbody>
+</table>
+<p>实验结果说明，DCT 盲水印对轻度 JPEG 和轻度缩放较稳定，但对强压缩、强噪声和 0.5 倍缩放更敏感。这是因为 DCT 方法依赖固定 8×8 分块和固定系数对，一旦攻击改变局部块的频率结构，系数大小关系就可能被破坏。DFT 非盲方法在部分攻击下表现较稳定，但它需要原图参与提取，因此适用场景不同。</p>
+<hr />
+<h1>11 命令行接口与实验脚本</h1>
+<h2>11.1 命令行接口</h2>
+<p>项目提供 <code>main.py</code>，支持嵌入、提取和攻击三类命令。</p>
+<h3>11.1.1 嵌入水印</h3>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 main.py embed \
+  --method dft \
+  --image data/misc/boat.512.tiff \
+  --watermark data/watermark/logo.png \
+  --output outputs/demo/boat_dft_watermarked.png
+</code></pre>
+<h3>11.1.2 提取水印</h3>
+<p>DFT 是非盲算法，需要原图：</p>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 main.py extract \
+  --method dft \
+  --image outputs/demo/boat_dft_watermarked.png \
+  --original data/misc/boat.512.tiff \
+  --output outputs/demo/boat_dft_extracted.png
+</code></pre>
+<p>DCT 是盲水印算法，不需要原图：</p>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 main.py extract \
+  --method dct \
+  --image outputs/demo/boat_dct_watermarked.png \
+  --output outputs/demo/boat_dct_extracted.png
+</code></pre>
+<h3>11.1.3 攻击图像</h3>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 main.py attack \
+  --type jpeg \
+  --quality 50 \
+  --image outputs/demo/boat_dft_watermarked.png \
+  --output outputs/demo/boat_dft_jpeg50.png
+</code></pre>
+<h2>11.2 实验脚本</h2>
+<p>完整实验建议使用脚本运行：</p>
+<pre><code class="language-bash">PYTHONPATH=.:src python3 experiments/run_all.py
+</code></pre>
+<p>该命令会依次执行：</p>
+<pre><code class="language-text">run_basic.py
+run_strength.py
+run_attacks.py
+</code></pre>
+<p>输出保存在：</p>
+<pre><code class="language-text">outputs/multi_image/
+</code></pre>
+<h2>11.3 自动化测试</h2>
+<p>项目包含 26 个自动化测试，覆盖：</p>
+<ul>
+<li>DFT 嵌入与提取。</li>
+<li>DCT 盲水印嵌入与提取。</li>
+<li>DWT 嵌入与提取。</li>
+<li>JPEG、resize、noise 攻击函数。</li>
+<li>MSE、PSNR、SSIM、NC、BER 指标。</li>
+<li>CLI 是否可运行。</li>
+<li>实验脚本是否生成 CSV 和图像。</li>
+<li>README 是否包含必要说明。</li>
+</ul>
+<p>测试命令：</p>
+<pre><code class="language-bash">python3 -m pytest -v
+</code></pre>
+<hr />
+<h1>12 结果讨论</h1>
+<h2>12.1 三种算法对比</h2>
+<table>
+<thead>
+<tr>
+<th>算法</th>
+<th>是否盲提取</th>
+<th>优点</th>
+<th>缺点</th>
+<th>适用定位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DFT</td>
+<td>否</td>
+<td>频域思想直观，抗部分攻击效果较好</td>
+<td>提取需要原图，失真相对明显</td>
+<td>基础任务与非盲基线</td>
+</tr>
+<tr>
+<td>DCT</td>
+<td>是</td>
+<td>不需要原图，图像质量高，解释性强</td>
+<td>对强压缩、强噪声、几何变换敏感</td>
+<td>挑战任务核心算法</td>
+</tr>
+<tr>
+<td>DWT</td>
+<td>扩展方法</td>
+<td>多分辨率分析，扰动较弱</td>
+<td>当前实现更偏展示扩展思路</td>
+<td>挑战部分补充算法</td>
+</tr>
+</tbody>
+</table>
+<h2>12.2 不可见性分析</h2>
+<p>从基础实验平均指标看，DCT 的 PSNR 约为 <code>47.541 dB</code>，SSIM 约为 <code>0.9957</code>，说明含水印图像和原图非常接近。DFT 的 PSNR 较低，说明当前频谱嵌入强度下图像扰动更明显，但它可以较好展示傅里叶域水印的基本机制。</p>
+<h2>12.3 鲁棒性分析</h2>
+<p>鲁棒性实验表明，水印算法没有绝对最优，而是取决于攻击类型和是否允许使用原图。DCT 盲水印在轻度 JPEG 和轻度缩放下表现较好，但强攻击会破坏 DCT 系数关系。DFT 方法需要原图，但在 JPEG 和噪声下 BER 较低。实际应用中可以根据需求选择：若验证端可获得原图，可以使用非盲方法；若验证端不能获得原图，则应选择 DCT 盲水印，并进一步加入纠错编码或同步机制。</p>
+<h2>12.4 参数选择分析</h2>
+<p>DCT 的 <code>delta</code> 是最重要参数。根据强度实验，<code>delta</code> 太小会导致 BER 较高，<code>delta</code> 太大则会降低 PSNR。默认值 <code>12.0</code> 在本项目中能够兼顾图像质量和提取准确性。</p>
+<p>DFT 的 <code>alpha</code> 控制频谱扰动强度。实验中可以看到，随着 <code>alpha</code> 增大，PSNR 明显下降，说明 DFT 对强度较敏感。</p>
+<p>DWT 的 <code>alpha</code> 控制小波子带扰动。当前默认较小，用于保证不可见性和展示扩展方法。</p>
+<hr />
+<h1>13 总结与展望</h1>
+<p>本项目围绕“图像频域水印”完成了完整的课程大作业实现。基础部分使用 DFT 完成频域嵌入、逆变换和水印提取；进阶部分完成嵌入强度扫描和抗攻击实验；挑战部分实现 DCT 盲水印，并扩展 DWT 小波域方法和彩色图 Y 通道水印接口。项目还提供了命令行工具、批量实验脚本、配置文件、自动化测试、详细手册和最终报告。</p>
+<p>实验结果表明，DCT 盲水印在默认参数下具有较好的不可见性和提取准确率，适合作为本项目的主要挑战算法。DFT 方法虽然需要原图，但更直观地体现了傅里叶频域水印思想。DWT 方法展示了小波域多分辨率分析的可能性。彩色 Y 通道接口使算法能够处理真实彩色图像，并保持输出图像的颜色。</p>
+<p>仍可改进的方向包括：</p>
+<ol>
+<li>在 DCT 水印中加入纠错编码，降低攻击后的 BER。</li>
+<li>使用伪随机位置嵌入，提高安全性。</li>
+<li>使用重复嵌入或多数投票，提高鲁棒性。</li>
+<li>引入 DWT-DCT-SVD 混合水印算法，提高对压缩和噪声的稳定性。</li>
+<li>针对缩放、裁剪等几何攻击加入同步模板或特征点对齐。</li>
+<li>将实验结果进一步导出为 PPT 图表，方便答辩展示。</li>
+</ol>
+<hr />
+<h1>14 小组分工与工作量说明</h1>
+<p>本项目由 侯治民、乔义杰、金灏、王师睿 共同完成。由于本项目需要完成算法实现、实验设计、数据处理、报告撰写和代码仓库维护等多项工作，整体分工按照“核心开发者承担更多实现与集成工作，其他组员分别负责实验、测试、文档和结果分析”的方式组织。其中侯治民承担主要代码实现、系统集成和最终交付工作，工作量占比最高。</p>
+<table>
+<thead>
+<tr>
+<th>组员</th>
+<th>主要负责内容</th>
+<th style="text-align: right;">工作量占比</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>侯治民</td>
+<td>需求分析；整体架构设计；DFT/DCT/DWT 算法实现；彩色图 Y 通道接口；CLI 与实验脚本集成；GitHub 仓库维护；最终报告统稿与 PDF 生成</td>
+<td style="text-align: right;">45%</td>
+</tr>
+<tr>
+<td>乔义杰</td>
+<td>数据集整理；灰度图和彩色图样本筛选；基础实验运行；基础对比图、频谱图和水印提取结果检查</td>
+<td style="text-align: right;">20%</td>
+</tr>
+<tr>
+<td>金灏</td>
+<td>进阶实验设计与结果整理；嵌入强度实验；JPEG、噪声、缩放攻击实验；CSV 指标统计和曲线图检查</td>
+<td style="text-align: right;">20%</td>
+</tr>
+<tr>
+<td>王师睿</td>
+<td>README 和使用手册整理；测试用例检查；报告文字校对；答辩材料和运行说明整理</td>
+<td style="text-align: right;">15%</td>
+</tr>
+</tbody>
+</table>
+<p>具体工作包括：</p>
+<ul>
+<li>阅读课程 PPT/作业说明，拆解基础、进阶、挑战三部分要求。</li>
+<li>设计模块化代码架构，拆分算法、指标、攻击、可视化和实验脚本。</li>
+<li>实现 DFT 频域非盲水印算法。</li>
+<li>实现 DCT 分块盲水印算法。</li>
+<li>实现 DWT 小波域扩展水印算法。</li>
+<li>实现彩色图 Y 通道频域水印接口。</li>
+<li>准备 USC-SIPI 和 BSD 灰度/彩色图像数据。</li>
+<li>设计并生成 HJQ 二值水印。</li>
+<li>完成基础实验、强度实验和抗攻击实验。</li>
+<li>输出多图对比图、频谱图、强度曲线和攻击曲线。</li>
+<li>编写 CLI 接口和 YAML 配置系统。</li>
+<li>编写自动化测试并验证主要功能。</li>
+<li>编写 README、详细使用手册和最终报告。</li>
+<li>将代码和报告上传到 GitHub 仓库，仓库地址为：https://github.com/Mercury-LH/frequncy_domain_watermarking</li>
+</ul>
+<hr />
+<h1>附录 A：主要运行命令汇总</h1>
+<pre><code class="language-bash"># 安装依赖
+python3 -m pip install -r requirements.txt
+
+# 运行测试
+python3 -m pytest -v
+
+# 一键运行全部实验
+PYTHONPATH=.:src python3 experiments/run_all.py
+
+# 基础实验
+PYTHONPATH=.:src python3 experiments/run_basic.py
+
+# 强度实验
+PYTHONPATH=.:src python3 experiments/run_strength.py
+
+# 抗攻击实验
+PYTHONPATH=.:src python3 experiments/run_attacks.py
+
+# DCT 盲水印嵌入
+PYTHONPATH=.:src python3 main.py embed \
+  --method dct \
+  --image data/misc/boat.512.tiff \
+  --watermark data/watermark/logo.png \
+  --output outputs/demo/boat_dct_watermarked.png
+
+# DCT 盲水印提取
+PYTHONPATH=.:src python3 main.py extract \
+  --method dct \
+  --image outputs/demo/boat_dct_watermarked.png \
+  --output outputs/demo/boat_dct_extracted.png
+</code></pre>
+<h1>附录 B：输出文件说明</h1>
+<pre><code class="language-text">outputs/multi_image/basic/metrics_basic_all.csv
+outputs/multi_image/strength/metrics_strength_all.csv
+outputs/multi_image/attacks/metrics_attacks_all.csv
+outputs/multi_image/strength/strength_psnr_all.png
+outputs/multi_image/strength/strength_ber_all.png
+outputs/multi_image/attacks/attack_ber_all.png
+</code></pre>
+<p>其中：</p>
+<ul>
+<li><code>metrics_basic_all.csv</code>：基础实验指标汇总。</li>
+<li><code>metrics_strength_all.csv</code>：嵌入强度实验指标汇总。</li>
+<li><code>metrics_attacks_all.csv</code>：抗攻击实验指标汇总。</li>
+<li><code>strength_psnr_all.png</code>：强度与 PSNR 曲线。</li>
+<li><code>strength_ber_all.png</code>：强度与 BER 曲线。</li>
+<li><code>attack_ber_all.png</code>：不同攻击下 BER 曲线。</li>
+</ul>
+</body>
+</html>

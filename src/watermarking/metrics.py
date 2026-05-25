@@ -49,11 +49,19 @@ def normalized_correlation(reference: np.ndarray, candidate: np.ndarray) -> floa
     return float(np.clip(np.sum(ref * cand) / denominator, -1.0, 1.0))
 
 
+def _quality_input(image: np.ndarray) -> np.ndarray:
+    if image.ndim == 3:
+        return np.mean(image.astype(np.float64), axis=2)
+    return image
+
+
 def image_quality(reference: np.ndarray, candidate: np.ndarray) -> dict[str, float]:
+    reference_quality = _quality_input(reference)
+    candidate_quality = _quality_input(candidate)
     return {
-        "mse": mse(reference, candidate),
-        "psnr": psnr(reference, candidate),
-        "ssim": ssim_score(reference, candidate),
+        "mse": mse(reference_quality, candidate_quality),
+        "psnr": psnr(reference_quality, candidate_quality),
+        "ssim": ssim_score(reference_quality, candidate_quality),
     }
 
 

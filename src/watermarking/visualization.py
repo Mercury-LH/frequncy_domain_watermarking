@@ -15,12 +15,21 @@ def _save(path: str | Path) -> None:
     plt.close()
 
 
+def _imshow(axis, image: np.ndarray) -> None:
+    if image.ndim == 3:
+        axis.imshow(np.clip(image, 0, 255).astype(np.uint8))
+    else:
+        axis.imshow(image, cmap="gray")
+
+
 def save_comparison_figure(path: str | Path, original: np.ndarray, watermarked: np.ndarray, watermark: np.ndarray, extracted: np.ndarray, title: str) -> None:
     difference = np.abs(original.astype(np.float64) - watermarked.astype(np.float64))
+    if difference.ndim == 3:
+        difference = np.mean(difference, axis=2)
     fig, axes = plt.subplots(1, 5, figsize=(14, 3))
     items = [(original, "Original"), (watermarked, "Watermarked"), (difference, "Difference"), (watermark, "Watermark"), (extracted, "Extracted")]
     for axis, (image, label) in zip(axes, items):
-        axis.imshow(image, cmap="gray")
+        _imshow(axis, image)
         axis.set_title(label)
         axis.axis("off")
     fig.suptitle(title)

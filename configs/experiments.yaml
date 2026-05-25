@@ -1,7 +1,38 @@
 dataset:
-  image: data/raw/lena.png
+  image: data/misc/boat.512.tiff
   watermark: data/watermark/logo.png
   image_size: [512, 512]
+  images:
+    - name: boat_gray
+      path: data/misc/boat.512.tiff
+      source_type: gray
+    - name: gray21_gray
+      path: data/misc/gray21.512.tiff
+      source_type: gray
+    - name: texture_gray
+      path: data/misc/5.1.09.tiff
+      source_type: gray
+    - name: pattern_gray
+      path: data/misc/5.2.08.tiff
+      source_type: gray
+    - name: house_color
+      path: data/misc/house.tiff
+      source_type: color
+    - name: airplane_color
+      path: data/misc/4.2.03.tiff
+      source_type: color
+    - name: bsd_color
+      path: data/images/test/101085.jpg
+      source_type: color
+    - name: bsd_landscape_color
+      path: data/images/test/103070.jpg
+      source_type: color
+    - name: bsd_train_color
+      path: data/images/train/100075.jpg
+      source_type: color
+    - name: bsd_texture_color
+      path: data/images/train/189003.jpg
+      source_type: color
 
 output:
   root: outputs
