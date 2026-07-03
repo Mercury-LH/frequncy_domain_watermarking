@@ -4,3 +4,7 @@ outputs/
 .pytest_cache/
 __pycache__/
 *.pyc
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.out
