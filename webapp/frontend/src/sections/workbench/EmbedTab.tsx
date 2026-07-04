@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Dropzone from "../../components/Dropzone";
 import MethodPicker from "../../components/MethodPicker";
-import MetricRow from "../../components/MetricRow";
 import ResultImage from "../../components/ResultImage";
 import StrengthSlider, { STRENGTH_RANGES } from "../../components/StrengthSlider";
 import { useI18n } from "../../i18n";
@@ -113,20 +112,29 @@ export default function EmbedTab() {
         </button>
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
       </div>
-      <div className="space-y-4" aria-live="polite">
+      <div className="space-y-5" aria-live="polite">
         {result && (
           <>
-            <h3 className="text-xl text-ink">{t.embed.resultTitle}</h3>
-            <ResultImage b64={result.watermarked_png_b64} alt={t.embed.resultTitle} downloadName="watermarked.png" />
-            <p className="text-sm text-ink-muted">{t.embed.downloadNote}</p>
-            <MetricRow label={t.embed.psnr} value={`${result.metrics.psnr} dB`} />
-            <MetricRow label={t.embed.ssim} value={result.metrics.ssim} />
-            <div className="grid grid-cols-2 gap-4">
-              <ResultImage b64={result.spectrum_before_b64} alt={t.embed.spectrumBefore} />
-              <ResultImage b64={result.spectrum_after_b64} alt={t.embed.spectrumAfter} />
+            <h3 className="font-display text-xl text-ink">{t.embed.resultTitle}</h3>
+            <ResultImage b64={result.watermarked_png_b64} alt={t.embed.resultTitle} downloadName="watermarked.png" contained />
+            <p className="text-xs leading-relaxed text-ink-muted">
+              {t.embed.downloadNote} {t.workbench.sizeNote}
+            </p>
+            <dl className="grid grid-cols-2 gap-4 border-t border-line pt-4">
+              <div>
+                <dt className="text-xs text-ink-muted">{t.embed.psnr}</dt>
+                <dd className="font-display text-2xl tabular-nums text-ink">{result.metrics.psnr} dB</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-ink-muted">{t.embed.ssim}</dt>
+                <dd className="font-display text-2xl tabular-nums text-ink">{result.metrics.ssim}</dd>
+              </div>
+            </dl>
+            <div className="grid grid-cols-2 gap-3 border-t border-line pt-4">
+              <ResultImage b64={result.spectrum_before_b64} alt={t.embed.spectrumBefore} label={t.embed.spectrumBefore} />
+              <ResultImage b64={result.spectrum_after_b64} alt={t.embed.spectrumAfter} label={t.embed.spectrumAfter} />
             </div>
-            <p className="text-sm text-ink-muted">{t.workbench.sizeNote}</p>
-            <button type="button" onClick={() => setActiveTab("extract")} className="text-brand underline-offset-4 hover:underline">
+            <button type="button" onClick={() => setActiveTab("extract")} className="text-sm text-brand underline-offset-4 hover:underline">
               {t.embed.toExtract}
             </button>
           </>

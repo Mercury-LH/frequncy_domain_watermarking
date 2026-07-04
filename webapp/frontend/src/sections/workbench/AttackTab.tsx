@@ -145,7 +145,7 @@ export default function AttackTab() {
       <div className="space-y-4" aria-live="polite">
         {result && (
           <>
-            <ResultImage b64={result.attacked_png_b64} alt={t.attack.attackedTitle} label={t.attack.attackedTitle} />
+            <ResultImage b64={result.attacked_png_b64} alt={t.attack.attackedTitle} label={t.attack.attackedTitle} contained />
             <ResultImage b64={result.extracted_png_b64} alt={t.attack.extractedTitle} label={t.attack.extractedTitle} />
             <h4 className="text-sm font-semibold text-ink">{t.attack.qualityTitle}</h4>
             <MetricRow label="PSNR" value={`${result.metrics.psnr} dB`} />

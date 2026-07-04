@@ -12,7 +12,7 @@ export default function Hero() {
       >
         {t.hero.cta}
       </a>
-      <div aria-hidden className="mt-16 animate-bounce text-ink-muted">
+      <div aria-hidden className="mt-16 animate-gentle-float text-sm text-ink-muted">
         ↓ {t.hero.scrollHint}
       </div>
     </section>
