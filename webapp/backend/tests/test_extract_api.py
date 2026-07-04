@@ -51,3 +51,23 @@ def test_extract_without_params_or_meta_400(client, synthetic_image):
     response = client.post("/api/extract", files={"image": ("x.png", encode_png(synthetic_image), "image/png")})
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "missing_params"
+
+
+def test_extract_wm_w_too_large_returns_bad_params(client, synthetic_image):
+    response = client.post(
+        "/api/extract",
+        data={"method": "dct", "wm_w": "100000", "wm_h": "64"},
+        files={"image": ("x.png", encode_png(synthetic_image), "image/png")},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_params"
+
+
+def test_extract_wm_w_negative_returns_bad_params(client, synthetic_image):
+    response = client.post(
+        "/api/extract",
+        data={"method": "dct", "wm_w": "-5", "wm_h": "64"},
+        files={"image": ("x.png", encode_png(synthetic_image), "image/png")},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "bad_params"
