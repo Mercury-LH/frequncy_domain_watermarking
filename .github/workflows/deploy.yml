@@ -34,21 +34,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Assemble Space tree and push to Hugging Face
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Upload deployable subset to the Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE: ${{ vars.HF_SPACE }}
         run: |
-          # The Space only needs the deployable subset. Push it as a single
-          # history-free commit so the research repo's large PDFs / data / zips
-          # never reach HF (which rejects any file >10MiB without LFS).
+          # The Space only needs the deployable subset. Uploading via
+          # huggingface_hub (not raw git) keeps the research repo's large
+          # PDFs/data/zips out AND transparently handles LFS/Xet for the binary
+          # story assets, which HF rejects on a plain git push.
+          pip install "huggingface_hub>=0.25"
           stage="$(mktemp -d)"
           cp -r src webapp Dockerfile .dockerignore README.md "$stage"/
           rm -rf "$stage"/webapp/frontend/node_modules "$stage"/webapp/frontend/dist
-          cd "$stage"
-          git init -q -b main
-          git config user.email "deploy@github-actions"
-          git config user.name "github-actions[bot]"
-          git add -A
-          git commit -q -m "Deploy ${GITHUB_SHA::7} from ${GITHUB_REPOSITORY}"
-          git push --force "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" main
+          python - "$stage" <<'PY'
+          import os, sys
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          api.upload_folder(
+              folder_path=sys.argv[1],
+              repo_id=os.environ["HF_SPACE"],
+              repo_type="space",
+              delete_patterns=["*"],  # clean sync: drop the HF starter files
+              commit_message=f"Deploy {os.environ.get('GITHUB_SHA','')[:7]} from {os.environ.get('GITHUB_REPOSITORY','')}",
+          )
+          print("uploaded to", os.environ["HF_SPACE"])
+          PY
