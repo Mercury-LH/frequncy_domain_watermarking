@@ -33,6 +33,15 @@ def downscale(image: np.ndarray, max_side: int = MAX_SIDE) -> np.ndarray:
 def _decode(data: bytes, flags: int) -> np.ndarray:
     if len(data) > MAX_BYTES:
         raise errors.file_too_large()
+    try:
+        with Image.open(io.BytesIO(data)) as probe:
+            width, height = probe.size
+        if width * height > 40_000_000:
+            raise errors.image_too_large()
+    except errors.ApiError:
+        raise
+    except Exception:
+        pass  # not PIL-readable; let cv2.imdecode be the authority
     array = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), flags)
     if array is None:
         raise errors.unsupported_format()
