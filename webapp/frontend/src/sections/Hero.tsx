@@ -12,8 +12,20 @@ export default function Hero() {
       >
         {t.hero.cta}
       </a>
-      <div aria-hidden className="mt-16 animate-gentle-float text-sm text-ink-muted">
-        ↓ {t.hero.scrollHint}
+      <div aria-hidden className="mt-16 flex flex-col items-center gap-2 text-sm text-ink-muted">
+        <span>{t.hero.scrollHint}</span>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </div>
     </section>
   );

@@ -30,23 +30,6 @@ h3 {
   text-wrap: balance;
 }
 
-/* Calm scroll hint — a slow, small vertical drift (no bounce, per DESIGN.md). */
-@keyframes gentle-float {
-  0%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.5;
-  }
-  50% {
-    transform: translateY(5px);
-    opacity: 1;
-  }
-}
-
-.animate-gentle-float {
-  animation: gentle-float 2.6s ease-in-out infinite;
-}
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
