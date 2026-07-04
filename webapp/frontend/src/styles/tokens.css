@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: oklch(0.97 0.003 170);
+  --color-surface: oklch(0.995 0.002 170);
+  --color-ink: oklch(0.22 0.01 170);
+  --color-ink-muted: oklch(0.45 0.015 170);
+  --color-brand: oklch(0.45 0.09 170);
+  --color-brand-deep: oklch(0.32 0.07 172);
+  --color-line: oklch(0.9 0.004 170);
+  --color-error: oklch(0.55 0.19 25);
+  --font-display: "Noto Serif SC", "STIX Two Text", serif;
+  --font-body: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
