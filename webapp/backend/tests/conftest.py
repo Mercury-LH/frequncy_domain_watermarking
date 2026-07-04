@@ -8,6 +8,10 @@ for p in (str(REPO_ROOT), str(REPO_ROOT / "src")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+import warnings
+
+warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL.*")
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient

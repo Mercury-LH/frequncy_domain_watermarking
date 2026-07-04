@@ -68,6 +68,8 @@ def render_text_watermark(text: str, canvas: int = 256) -> np.ndarray:
         raise errors.missing_watermark()
     if len(cleaned) > 20:
         raise errors.text_too_long()
+    if canvas <= 8:
+        raise ValueError("canvas must be larger than 8 pixels")
     font_path = find_cjk_font()
     image = Image.new("L", (canvas, canvas), 0)
     draw = ImageDraw.Draw(image)

@@ -68,3 +68,8 @@ def test_render_text_watermark_rejects_empty():
     with pytest.raises(ApiError) as excinfo:
         services.render_text_watermark("   ")
     assert excinfo.value.code == "missing_watermark"
+
+
+def test_render_text_watermark_rejects_tiny_canvas():
+    with pytest.raises(ValueError):
+        services.render_text_watermark("hi", canvas=8)
