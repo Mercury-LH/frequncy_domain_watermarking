@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="border-t border-line py-10 text-center text-sm text-ink-muted">
       <p>{t.footer.tagline}</p>
       <p className="mt-1">
-        <a href="https://github.com" className="text-brand underline-offset-4 hover:underline">
+        <a href="https://github.com/Mercury-LH/frequncy_domain_watermarking" className="text-brand underline-offset-4 hover:underline">
           {t.footer.source}
         </a>
         {" · "}
