@@ -73,3 +73,24 @@ def test_render_text_watermark_rejects_empty():
 def test_render_text_watermark_rejects_tiny_canvas():
     with pytest.raises(ValueError):
         services.render_text_watermark("hi", canvas=8)
+
+
+def test_spectrum_png_b64_decodes(synthetic_image):
+    import base64
+
+    b64 = services.spectrum_png_b64(synthetic_image.astype(np.float64))
+    raw = base64.b64decode(b64)
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_png_params_roundtrip(synthetic_image):
+    import cv2
+
+    rgb = cv2.cvtColor(synthetic_image, cv2.COLOR_GRAY2RGB)
+    params = {"v": 1, "method": "dct", "strength": 12.0, "wm_w": 64, "wm_h": 64}
+    data = services.png_bytes_with_params(rgb, params)
+    assert services.read_png_params(data) == params
+
+
+def test_read_png_params_none_when_absent(synthetic_image):
+    assert services.read_png_params(encode_png(synthetic_image)) is None

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import base64
+import io
+import json
 import os
 
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from PIL.PngImagePlugin import PngInfo
 
 from webapp.backend import errors
 
@@ -85,3 +89,43 @@ def render_text_watermark(text: str, canvas: int = 256) -> np.ndarray:
     draw.text((x, y), cleaned, fill=255, font=font)
     array = np.array(image, dtype=np.uint8)
     return np.where(array > 127, 255, 0).astype(np.uint8)
+
+
+PARAMS_KEYWORD = "watermark-params"
+
+
+def png_b64(image: np.ndarray) -> str:
+    if image.ndim == 3:
+        encoded = cv2.imencode(".png", cv2.cvtColor(image, cv2.COLOR_RGB2BGR))[1]
+    else:
+        encoded = cv2.imencode(".png", image)[1]
+    return base64.b64encode(encoded.tobytes()).decode("ascii")
+
+
+def spectrum_png_b64(gray: np.ndarray) -> str:
+    spectrum = np.fft.fftshift(np.fft.fft2(gray.astype(np.float64)))
+    magnitude = np.log1p(np.abs(spectrum))
+    lo, hi = float(magnitude.min()), float(magnitude.max())
+    normalized = np.zeros_like(magnitude) if hi <= lo else (magnitude - lo) / (hi - lo)
+    return png_b64((normalized * 255).astype(np.uint8))
+
+
+def png_bytes_with_params(image_rgb: np.ndarray, params: dict) -> bytes:
+    info = PngInfo()
+    info.add_text(PARAMS_KEYWORD, json.dumps(params))
+    buffer = io.BytesIO()
+    Image.fromarray(image_rgb).save(buffer, format="PNG", pnginfo=info)
+    return buffer.getvalue()
+
+
+def read_png_params(data: bytes) -> dict | None:
+    try:
+        text = Image.open(io.BytesIO(data)).text.get(PARAMS_KEYWORD)
+    except Exception:
+        return None
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return None
