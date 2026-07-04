@@ -1,3 +1,13 @@
+---
+title: Invisible Watermark Studio
+emoji: 🌊
+colorFrom: green
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 图像频域水印
 
 本项目实现信号与系统大作业题目5：图像频域水印。系统支持 DFT、DCT、DWT 三种频域水印算法，覆盖基础嵌入/提取、嵌入强度分析和 JPEG 压缩、缩放、加噪等抗攻击能力测试。
