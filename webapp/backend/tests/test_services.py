@@ -43,3 +43,28 @@ def test_decode_host_image_rejects_tiny():
 def test_decode_watermark_image_is_grayscale(synthetic_watermark):
     decoded = services.decode_watermark_image(encode_png(synthetic_watermark))
     assert decoded.ndim == 2
+
+
+def test_render_text_watermark_chinese_not_blank():
+    bitmap = services.render_text_watermark("水印测试")
+    assert bitmap.shape == (256, 256)
+    assert set(np.unique(bitmap)).issubset({0, 255})
+    assert (bitmap == 255).mean() > 0.01
+
+
+def test_render_text_watermark_differs_by_text():
+    a = services.render_text_watermark("ABC")
+    b = services.render_text_watermark("XYZ")
+    assert (a != b).any()
+
+
+def test_render_text_watermark_rejects_long_text():
+    with pytest.raises(ApiError) as excinfo:
+        services.render_text_watermark("字" * 21)
+    assert excinfo.value.code == "text_too_long"
+
+
+def test_render_text_watermark_rejects_empty():
+    with pytest.raises(ApiError) as excinfo:
+        services.render_text_watermark("   ")
+    assert excinfo.value.code == "missing_watermark"
