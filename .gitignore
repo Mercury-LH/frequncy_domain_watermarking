@@ -1,6 +1,8 @@
 
 .worktrees/
 outputs/
+.superpowers/
+.DS_Store
 .pytest_cache/
 __pycache__/
 *.pyc
