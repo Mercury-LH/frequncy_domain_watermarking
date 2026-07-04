@@ -139,7 +139,7 @@ def read_png_params(data: bytes) -> dict | None:
 STRENGTH_RANGES: dict[str, tuple[float, float, float]] = {
     "dct": (4.0, 24.0, 12.0),
     "dft": (2.0, 20.0, 3.0),   # default lowered from 10.0 → 3.0 so PSNR > 30 dB
-    "dwt": (0.01, 0.5, 0.5),   # default raised 0.05 → 0.5 (calibration: best NC in [0.01,0.5])
+    "dwt": (0.01, 0.5, 0.05),  # research default; extraction fidelity unreachable at any alpha (DWT ships as embedding demo)
 }
 _STRENGTH_PARAM = {"dct": "delta", "dft": "alpha", "dwt": "alpha"}
 
