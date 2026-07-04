@@ -39,7 +39,7 @@ def main() -> None:
 
     host = _load_host()
     watermark = services.render_text_watermark("隐形水印")
-    embed = services.run_embed(host, watermark, "dct", 12.0)
+    embed = services.run_embed(host, watermark, "dct", 20.0)
 
     _save("01-photo.png", services.png_b64(host))
     _save("02-spectrum.png", embed["spectrum_before_b64"])
@@ -51,7 +51,7 @@ def main() -> None:
     _save("04-diff20.png", services.png_b64(diff))
 
     side = embed["params"]["wm_w"]
-    outcome = services.run_attack(watermarked, "jpeg", 90, "dct", side, side)
+    outcome = services.run_attack(watermarked, "jpeg", 80, "dct", side, side)
     _save("05-attacked.png", outcome["attacked_png_b64"])
     _save("06-extracted.png", outcome["extracted_png_b64"])
 
