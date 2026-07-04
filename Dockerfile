@@ -15,4 +15,4 @@ COPY webapp/backend /app/webapp/backend
 COPY --from=frontend /build/dist /app/webapp/frontend/dist
 ENV PYTHONPATH=/app:/app/src
 EXPOSE 7860
-CMD ["uvicorn", "webapp.backend.app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "webapp.backend.app:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips=*"]
