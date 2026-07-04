@@ -4,6 +4,7 @@ import MetricRow from "../../components/MetricRow";
 import ResultImage from "../../components/ResultImage";
 import { useI18n } from "../../i18n";
 import { ApiFailure, attack, type AttackResponse } from "../../lib/api";
+import { readWatermarkParams, type WmParams } from "../../lib/pngMeta";
 import { useWorkbench } from "../../state/workbench";
 
 const ATTACK_RANGES = {
@@ -25,6 +26,8 @@ export default function AttackTab() {
   const { t, lang } = useI18n();
   const { lastEmbed } = useWorkbench();
   const [image, setImage] = useState<File | null>(null);
+  const [meta, setMeta] = useState<WmParams | null>(null);
+  const [original, setOriginal] = useState<File | null>(null);
   const [attackType, setAttackType] = useState<AttackKey>("jpeg");
   const [param, setParam] = useState<number>(ATTACK_RANGES.jpeg.default);
   const [busy, setBusy] = useState(false);
@@ -36,6 +39,16 @@ export default function AttackTab() {
     setParam(ATTACK_RANGES[key].default);
   };
 
+  const onImage = async (file: File) => {
+    setImage(file);
+    setResult(null);
+    const params = readWatermarkParams(await file.arrayBuffer());
+    setMeta(params);
+    if (!params) setOriginal(null);
+  };
+
+  const effectiveMethod = meta?.method ?? null;
+
   const submit = async () => {
     if (!image) return;
     setBusy(true);
@@ -45,6 +58,7 @@ export default function AttackTab() {
       form.append("image", image);
       form.append("attack", attackType);
       form.append("param", String(param));
+      if (original) form.append("original", original);
       setResult(await attack(form));
     } catch (cause) {
       if (cause instanceof ApiFailure) {
@@ -62,17 +76,27 @@ export default function AttackTab() {
     <div className="grid gap-8 lg:grid-cols-2">
       <div className="space-y-6">
         <p className="text-sm text-ink-muted">{t.attack.intro}</p>
-        <p className="text-sm text-ink-muted">{t.attack.blindOnly}</p>
         {lastEmbed && (
           <button
             type="button"
-            onClick={() => setImage(base64ToFile(lastEmbed.pngB64, "watermarked.png"))}
+            onClick={() => {
+              setImage(base64ToFile(lastEmbed.pngB64, "watermarked.png"));
+              setMeta(lastEmbed.params);
+              setResult(null);
+            }}
             className="rounded border border-brand px-3 py-1 text-sm text-brand transition-colors duration-200 hover:bg-brand hover:text-white"
           >
             {t.attack.useLast}
           </button>
         )}
-        <Dropzone value={image} onChange={setImage} />
+        <Dropzone value={image} onChange={onImage} />
+        {effectiveMethod === "dft" && (
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-semibold text-ink">{t.extract.originalLabel}</legend>
+            <p className="text-xs text-ink-muted">{t.extract.originalHint}</p>
+            <Dropzone value={original} onChange={setOriginal} />
+          </fieldset>
+        )}
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-ink">{t.attack.attackLabel}</legend>
           <div role="radiogroup" className="flex flex-wrap gap-2">
@@ -109,7 +133,7 @@ export default function AttackTab() {
         </fieldset>
         <button
           type="button"
-          disabled={busy || !image}
+          disabled={busy || !image || (effectiveMethod === "dft" && !original)}
           onClick={submit}
           className="w-full rounded-lg bg-brand py-3 font-semibold text-white transition-colors duration-200 hover:bg-brand-deep disabled:opacity-40"
         >
