@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import math
 import os
 
 import cv2
@@ -11,6 +12,10 @@ from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
 
 from webapp.backend import errors
+from watermarking.attacks import apply_attack
+from watermarking.io_utils import luminance_channel, prepare_watermark, replace_luminance
+from watermarking.metrics import image_quality, watermark_quality
+from watermarking.registry import create_watermarker
 
 MAX_BYTES = 10 * 1024 * 1024
 MAX_SIDE = 1024
@@ -129,3 +134,135 @@ def read_png_params(data: bytes) -> dict | None:
         return json.loads(text)
     except json.JSONDecodeError:
         return None
+
+
+STRENGTH_RANGES: dict[str, tuple[float, float, float]] = {
+    "dct": (4.0, 24.0, 12.0),
+    "dft": (2.0, 20.0, 3.0),   # default lowered from 10.0 → 3.0 so PSNR > 30 dB
+    "dwt": (0.01, 0.5, 0.5),   # default raised 0.05 → 0.5 (calibration: best NC in [0.01,0.5])
+}
+_STRENGTH_PARAM = {"dct": "delta", "dft": "alpha", "dwt": "alpha"}
+
+
+def validate_method(method: str) -> str:
+    key = method.lower()
+    if key not in STRENGTH_RANGES:
+        raise errors.bad_method()
+    return key
+
+
+def validate_strength(method: str, strength: float) -> float:
+    low, high, _ = STRENGTH_RANGES[validate_method(method)]
+    if not low <= strength <= high:
+        raise errors.bad_strength(method, low, high)
+    return float(strength)
+
+
+def choose_watermark_side(height: int, width: int) -> int:
+    side = min(64, int(math.sqrt((height // 8) * (width // 8))))
+    if side < 8:
+        raise errors.image_too_small()
+    return side
+
+
+def _make(method: str, strength: float):
+    return create_watermarker(method, **{_STRENGTH_PARAM[method]: strength})
+
+
+def _capped_quality(reference: np.ndarray, candidate: np.ndarray) -> dict:
+    quality = image_quality(reference, candidate)
+    return {"psnr": round(min(quality["psnr"], 99.0), 2), "ssim": round(quality["ssim"], 4)}
+
+
+def run_embed(host_rgb: np.ndarray, watermark_gray: np.ndarray, method: str, strength: float) -> dict:
+    method = validate_method(method)
+    strength = validate_strength(method, strength)
+    height, width = host_rgb.shape[:2]
+    side = choose_watermark_side(height, width)
+    prepared = prepare_watermark(watermark_gray, (side, side))
+    luminance = luminance_channel(host_rgb)
+    result = _make(method, strength).embed(luminance, prepared)
+    output_rgb = replace_luminance(host_rgb, result.image)
+    params = {"v": 1, "method": method, "strength": strength, "wm_w": side, "wm_h": side}
+    return {
+        "watermarked_png_b64": base64.b64encode(png_bytes_with_params(output_rgb, params)).decode("ascii"),
+        "metrics": _capped_quality(host_rgb, output_rgb),
+        "spectrum_before_b64": spectrum_png_b64(luminance),
+        "spectrum_after_b64": spectrum_png_b64(result.image),
+        "params": params,
+        "prepared_watermark_png_b64": png_b64(prepared),
+    }
+
+
+def run_extract(
+    image_rgb: np.ndarray,
+    method: str,
+    wm_w: int,
+    wm_h: int,
+    original_rgb: np.ndarray | None = None,
+    reference_watermark: np.ndarray | None = None,
+) -> dict:
+    method = validate_method(method)
+    if method == "dft" and original_rgb is None:
+        raise errors.dft_requires_original()
+    luminance = luminance_channel(image_rgb)
+    original = luminance_channel(original_rgb) if original_rgb is not None else None
+    if original is not None and original.shape != luminance.shape:
+        raise errors.shape_mismatch()
+    low, high, default = STRENGTH_RANGES[method]
+    extraction = _make(method, default).extract(luminance, (int(wm_h), int(wm_w)), original_image=original)
+    payload: dict = {"watermark_png_b64": png_b64(extraction.watermark)}
+    if reference_watermark is not None:
+        reference = prepare_watermark(reference_watermark, (int(wm_h), int(wm_w)))
+        quality = watermark_quality(reference, extraction.watermark)
+        payload["nc"] = round(quality["nc"], 4)
+        payload["ber"] = round(quality["ber"], 4)
+    return payload
+
+
+_ATTACKS = {"jpeg", "resize", "noise"}
+
+
+def attack_image(image_rgb: np.ndarray, attack: str, param: float) -> np.ndarray:
+    key = attack.lower()
+    if key not in _ATTACKS:
+        raise errors.bad_attack()
+    if key == "jpeg":
+        quality = int(np.clip(param, 1, 100))
+        bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+        ok, encoded = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        if not ok:
+            raise errors.unsupported_format()
+        return cv2.cvtColor(cv2.imdecode(encoded, cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+    if key == "resize":
+        scale = float(np.clip(param, 0.1, 1.0))
+        height, width = image_rgb.shape[:2]
+        small = cv2.resize(image_rgb, (max(1, int(width * scale)), max(1, int(height * scale))), interpolation=cv2.INTER_LINEAR)
+        return cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR)
+    sigma = float(np.clip(param, 0.0, 50.0))
+    noise = np.random.default_rng(42).normal(0, sigma, size=image_rgb.shape)
+    return np.clip(image_rgb.astype(np.float64) + noise, 0, 255).astype(np.uint8)
+
+
+def run_attack(
+    image_rgb: np.ndarray,
+    attack: str,
+    param: float,
+    method: str,
+    wm_w: int,
+    wm_h: int,
+    original_rgb: np.ndarray | None = None,
+) -> dict:
+    method = validate_method(method)
+    before = run_extract(image_rgb, method, wm_w, wm_h, original_rgb=original_rgb)
+    attacked = attack_image(image_rgb, attack, param)
+    after = run_extract(attacked, method, wm_w, wm_h, original_rgb=original_rgb)
+    before_wm = _decode(base64.b64decode(before["watermark_png_b64"]), cv2.IMREAD_GRAYSCALE)
+    after_wm = _decode(base64.b64decode(after["watermark_png_b64"]), cv2.IMREAD_GRAYSCALE)
+    quality = watermark_quality(before_wm, after_wm)
+    return {
+        "attacked_png_b64": png_b64(attacked),
+        "extracted_png_b64": after["watermark_png_b64"],
+        "metrics": _capped_quality(image_rgb, attacked),
+        "watermark": {"nc": round(quality["nc"], 4), "ber": round(quality["ber"], 4)},
+    }

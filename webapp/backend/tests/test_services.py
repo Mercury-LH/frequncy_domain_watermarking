@@ -94,3 +94,63 @@ def test_png_params_roundtrip(synthetic_image):
 
 def test_read_png_params_none_when_absent(synthetic_image):
     assert services.read_png_params(encode_png(synthetic_image)) is None
+
+
+def test_choose_watermark_side_512():
+    assert services.choose_watermark_side(512, 512) == 64
+
+
+def test_choose_watermark_side_small_image():
+    assert services.choose_watermark_side(256, 256) == 32
+
+
+def test_strength_validation():
+    with pytest.raises(ApiError) as excinfo:
+        services.validate_strength("dct", 100.0)
+    assert excinfo.value.code == "bad_strength"
+
+
+@pytest.mark.parametrize("method", ["dct", "dft", "dwt"])
+def test_embed_extract_roundtrip(method, synthetic_image, synthetic_watermark):
+    import cv2
+
+    rgb = cv2.cvtColor(synthetic_image, cv2.COLOR_GRAY2RGB)
+    result = services.run_embed(rgb, synthetic_watermark, method, services.STRENGTH_RANGES[method][2])
+    assert result["metrics"]["psnr"] > 30.0
+    params = result["params"]
+    watermarked = services.decode_host_image(__import__("base64").b64decode(result["watermarked_png_b64"]))
+    original = rgb if method == "dft" else None
+    extraction = services.run_extract(
+        watermarked, method, params["wm_w"], params["wm_h"],
+        original_rgb=original, reference_watermark=synthetic_watermark,
+    )
+    assert extraction["nc"] > 0.85
+
+
+def test_run_extract_dft_without_original_raises(synthetic_image):
+    import cv2
+
+    rgb = cv2.cvtColor(synthetic_image, cv2.COLOR_GRAY2RGB)
+    with pytest.raises(ApiError) as excinfo:
+        services.run_extract(rgb, "dft", 64, 64)
+    assert excinfo.value.code == "dft_requires_original"
+
+
+def test_attack_image_jpeg_keeps_shape(synthetic_image):
+    import cv2
+
+    rgb = cv2.cvtColor(synthetic_image, cv2.COLOR_GRAY2RGB)
+    attacked = services.attack_image(rgb, "jpeg", 60)
+    assert attacked.shape == rgb.shape
+
+
+def test_run_attack_dct_survives_mild_jpeg(synthetic_image, synthetic_watermark):
+    import base64
+
+    import cv2
+
+    rgb = cv2.cvtColor(synthetic_image, cv2.COLOR_GRAY2RGB)
+    embed = services.run_embed(rgb, synthetic_watermark, "dct", 12.0)
+    watermarked = services.decode_host_image(base64.b64decode(embed["watermarked_png_b64"]))
+    outcome = services.run_attack(watermarked, "jpeg", 90, "dct", 64, 64)
+    assert outcome["watermark"]["nc"] > 0.5
