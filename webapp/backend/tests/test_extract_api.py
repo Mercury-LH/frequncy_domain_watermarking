@@ -38,6 +38,15 @@ def test_extract_dft_missing_original_422(client, synthetic_image, synthetic_wat
     assert response.json()["error"]["code"] == "dft_requires_original"
 
 
+def test_extract_bad_dims_returns_bilingual_400(client, synthetic_image):
+    from webapp.backend.tests.conftest import encode_png
+    r = client.post("/api/extract", data={"method": "dct", "wm_w": "100000", "wm_h": "100000"},
+                    files={"image": ("x.png", encode_png(synthetic_image), "image/png")})
+    assert r.status_code == 400
+    body = r.json()["error"]
+    assert body["code"] == "bad_params" and body["zh"] and body["en"]
+
+
 def test_extract_without_params_or_meta_400(client, synthetic_image):
     response = client.post("/api/extract", files={"image": ("x.png", encode_png(synthetic_image), "image/png")})
     assert response.status_code == 400

@@ -12,7 +12,6 @@ from PIL import Image, ImageDraw, ImageFont
 from PIL.PngImagePlugin import PngInfo
 
 from webapp.backend import errors
-from watermarking.attacks import apply_attack
 from watermarking.io_utils import luminance_channel, prepare_watermark, replace_luminance
 from watermarking.metrics import image_quality, watermark_quality
 from watermarking.registry import create_watermarker
@@ -42,10 +41,11 @@ def _decode(data: bytes, flags: int) -> np.ndarray:
 
 def decode_host_image(data: bytes) -> np.ndarray:
     bgr = _decode(data, cv2.IMREAD_COLOR)
-    if min(bgr.shape[:2]) < MIN_SIDE:
-        raise errors.image_too_small()
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-    return downscale(rgb)
+    rgb = downscale(rgb)
+    if min(rgb.shape[:2]) < MIN_SIDE:
+        raise errors.image_too_small()
+    return rgb
 
 
 def decode_watermark_image(data: bytes) -> np.ndarray:
@@ -203,6 +203,8 @@ def run_extract(
     reference_watermark: np.ndarray | None = None,
 ) -> dict:
     method = validate_method(method)
+    if not (8 <= int(wm_w) <= 128 and 8 <= int(wm_h) <= 128):
+        raise errors.bad_params()
     if method == "dft" and original_rgb is None:
         raise errors.dft_requires_original()
     luminance = luminance_channel(image_rgb)
@@ -254,6 +256,8 @@ def run_attack(
     original_rgb: np.ndarray | None = None,
 ) -> dict:
     method = validate_method(method)
+    if not (8 <= int(wm_w) <= 128 and 8 <= int(wm_h) <= 128):
+        raise errors.bad_params()
     before = run_extract(image_rgb, method, wm_w, wm_h, original_rgb=original_rgb)
     attacked = attack_image(image_rgb, attack, param)
     after = run_extract(attacked, method, wm_w, wm_h, original_rgb=original_rgb)

@@ -59,3 +59,11 @@ def missing_params() -> ApiError:
 
 def rate_limited() -> ApiError:
     return ApiError(429, "rate_limited", "请求太频繁，请一分钟后再试", "Too many requests, try again in a minute")
+
+
+def bad_params() -> ApiError:
+    return ApiError(400, "bad_params", "水印尺寸参数无效（须为 8–128 的整数）", "Invalid watermark size (must be an integer between 8 and 128)")
+
+
+def image_too_large() -> ApiError:
+    return ApiError(400, "image_too_large", "图片像素过多（上限 4000 万像素）", "Image has too many pixels (limit 40 megapixels)")

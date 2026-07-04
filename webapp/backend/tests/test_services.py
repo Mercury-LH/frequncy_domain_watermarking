@@ -156,6 +156,25 @@ def test_run_attack_dct_survives_mild_jpeg(synthetic_image, synthetic_watermark)
     assert outcome["watermark"]["nc"] > 0.5
 
 
+@pytest.mark.parametrize("bad", [4, 200, -5, 0])
+def test_run_extract_rejects_out_of_range_dims(bad, synthetic_image):
+    import cv2
+    rgb = cv2.cvtColor(synthetic_image, cv2.COLOR_GRAY2RGB)
+    with pytest.raises(ApiError) as exc:
+        services.run_extract(rgb, "dct", bad, 64)
+    assert exc.value.code == "bad_params"
+
+
+def test_decode_host_image_downscale_preserves_min_side():
+    import numpy as np
+    from webapp.backend.tests.conftest import encode_png
+    # 150x8000 → after downscale to 1024 long side, short side ~19px → must reject
+    tall = np.random.default_rng(1).integers(0, 255, (8000, 150, 3), dtype=np.uint8)
+    with pytest.raises(ApiError) as exc:
+        services.decode_host_image(encode_png(tall))
+    assert exc.value.code == "image_too_small"
+
+
 def test_embed_extract_roundtrip_dwt_structural(synthetic_image, synthetic_watermark):
     """DWT blind extraction (median threshold in src/watermarking) cannot recover
     sparse watermarks without the original image: measured NC ~= 0.05 across the
