@@ -11,9 +11,10 @@ for _p in (str(REPO_ROOT), str(REPO_ROOT / "src")):
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
 
 from webapp.backend.errors import ApiError
-from webapp.backend.routes import router
+from webapp.backend.routes import limiter, router
 
 FRONTEND_DIST = REPO_ROOT / "webapp" / "frontend" / "dist"
 
@@ -24,6 +25,15 @@ def create_app() -> FastAPI:
     @app.exception_handler(ApiError)
     async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content=exc.payload())
+
+    app.state.limiter = limiter
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+        from webapp.backend.errors import rate_limited
+
+        err = rate_limited()
+        return JSONResponse(status_code=err.status, content=err.payload())
 
     app.include_router(router, prefix="/api")
 

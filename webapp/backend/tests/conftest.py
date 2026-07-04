@@ -22,6 +22,9 @@ from webapp.backend.app import create_app
 
 @pytest.fixture()
 def client() -> TestClient:
+    from webapp.backend.routes import limiter
+
+    limiter.reset()
     return TestClient(create_app())
 
 

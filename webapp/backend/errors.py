@@ -51,3 +51,11 @@ def bad_attack() -> ApiError:
 
 def shape_mismatch() -> ApiError:
     return ApiError(422, "shape_mismatch", "原图与含水印图尺寸不一致", "Original and watermarked images differ in size")
+
+
+def missing_params() -> ApiError:
+    return ApiError(400, "missing_params", "该 PNG 不含参数信息，请手动选择算法与水印尺寸", "This PNG has no embedded params; choose method and watermark size manually")
+
+
+def rate_limited() -> ApiError:
+    return ApiError(429, "rate_limited", "请求太频繁，请一分钟后再试", "Too many requests, try again in a minute")
