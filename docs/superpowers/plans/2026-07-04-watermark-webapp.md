@@ -17,7 +17,8 @@
 - 上传 ≤ 10MB；处理前最长边缩至 1024px（输出即该尺寸，界面明示）；图片最短边 ≥ 128px；水印文字 ≤ 20 字符。
 - 所有面向用户的文案必须同时存在于 zh/en 两份字典（vitest 有键完整性测试）；后端错误返回 `{"error": {"code", "zh", "en"}}`。
 - 提取水印时必须**新建** Watermarker 实例——`DWTWatermarker.extract` 会走 `_last_watermark` 同实例缓存，复用嵌入实例会产生假结果。
-- 强度参数范围（前端滑杆与后端校验一致）：dct `delta∈[4,24]` 默认 12；dft `alpha∈[2,20]` 默认 10；dwt `alpha∈[0.01,0.5]` 默认 0.05。
+- 强度参数范围（前端滑杆与后端校验一致，Task 5 校准后）：dct `delta∈[4,24]` 默认 12；dft `alpha∈[2,20]` 默认 **3**（原 10 使 PSNR 跌破 30dB）；dwt `alpha∈[0.01,0.5]` 默认 0.05。
+- DWT 定位为**嵌入演示**：其盲提取（中值阈值）对稀疏水印结构性失效（实测 NC≈0.05），往返保真只由 DCT/DFT 承诺；界面文案如实标注。
 - PSNR 可能为 `inf`，序列化前用 `min(psnr, 99.0)` 截断。
 - 视觉遵循 `DESIGN.md`：OKLCH tokens、禁渐变文字/玻璃拟态/侧边彩条/eyebrow 标签/奶油底色；动效 150–250ms 指数缓出；`prefers-reduced-motion` 全适配；WCAG AA 对比度。
 - 端口：本地后端 8000，前端 dev 5173（proxy /api → 8000）；Docker/HF 7860。
@@ -1479,7 +1480,7 @@ export const zh = {
     methods: {
       dct: { name: "DCT", hint: "推荐 · 盲提取，抗 JPEG 强" },
       dft: { name: "DFT", hint: "非盲 · 提取时需要原图" },
-      dwt: { name: "DWT", hint: "多分辨率 · 演示性质" },
+      dwt: { name: "DWT", hint: "多分辨率 · 嵌入演示（盲提取不可靠）" },
     },
     strengthLabel: "嵌入强度",
     strengthHint: "越强越鲁棒，越弱画质越好",
@@ -1577,7 +1578,7 @@ export const en: Dict = {
     methods: {
       dct: { name: "DCT", hint: "Recommended · blind extraction, JPEG-robust" },
       dft: { name: "DFT", hint: "Non-blind · needs the original to extract" },
-      dwt: { name: "DWT", hint: "Multi-resolution · for demonstration" },
+      dwt: { name: "DWT", hint: "Multi-resolution · embedding demo (blind extraction unreliable)" },
     },
     strengthLabel: "Embedding strength",
     strengthHint: "Stronger is more robust; weaker preserves quality",
@@ -2064,7 +2065,7 @@ import { useI18n } from "../i18n";
 
 export const STRENGTH_RANGES = {
   dct: { min: 4, max: 24, step: 1, default: 12 },
-  dft: { min: 2, max: 20, step: 1, default: 10 },
+  dft: { min: 2, max: 20, step: 1, default: 3 },
   dwt: { min: 0.01, max: 0.5, step: 0.01, default: 0.05 },
 } as const;
 
