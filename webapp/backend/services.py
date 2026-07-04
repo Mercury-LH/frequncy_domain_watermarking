@@ -40,6 +40,10 @@ def _decode(data: bytes, flags: int) -> np.ndarray:
             raise errors.image_too_large()
     except errors.ApiError:
         raise
+    except Image.DecompressionBombError:
+        # PIL raises this above ~178MP, before our 40MP check runs — reject it
+        # rather than letting the far more permissive cv2.imdecode decode the bomb.
+        raise errors.image_too_large()
     except Exception:
         pass  # not PIL-readable; let cv2.imdecode be the authority
     array = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), flags)

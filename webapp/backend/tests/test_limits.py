@@ -45,3 +45,18 @@ def test_pixel_bomb_returns_image_too_large(client):
     )
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "image_too_large"
+
+
+def test_decompression_bomb_above_pillow_threshold_rejected(client):
+    """A PNG above Pillow's ~178MP DecompressionBombError threshold must still be
+    rejected: PIL raises DecompressionBombError before our 40MP size check runs,
+    and that must map to image_too_large rather than falling through to cv2."""
+    buf = io.BytesIO()
+    Image.new("L", (13780, 13780)).save(buf, format="PNG")  # ~189MP, tiny payload
+    response = client.post(
+        "/api/embed",
+        data={"method": "dct", "strength": "12.0", "watermark_text": "test"},
+        files={"image": ("megabomb.png", buf.getvalue(), "image/png")},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "image_too_large"

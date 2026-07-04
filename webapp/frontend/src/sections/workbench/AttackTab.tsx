@@ -44,7 +44,7 @@ export default function AttackTab() {
     setResult(null);
     const params = readWatermarkParams(await file.arrayBuffer());
     setMeta(params);
-    if (!params) setOriginal(null);
+    if (params?.method !== "dft") setOriginal(null);
   };
 
   const effectiveMethod = meta?.method ?? null;
@@ -82,6 +82,7 @@ export default function AttackTab() {
             onClick={() => {
               setImage(base64ToFile(lastEmbed.pngB64, "watermarked.png"));
               setMeta(lastEmbed.params);
+              if (lastEmbed.params.method !== "dft") setOriginal(null);
               setResult(null);
             }}
             className="rounded border border-brand px-3 py-1 text-sm text-brand transition-colors duration-200 hover:bg-brand hover:text-white"
