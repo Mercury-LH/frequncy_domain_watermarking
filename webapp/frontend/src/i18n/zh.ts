@@ -65,6 +65,7 @@ export const zh = {
   },
   attack: {
     intro: "攻击一张含水印的图，看水印能不能扛住。",
+    blindOnly: "攻击实验室仅支持盲提取算法（DCT / DWT）；DFT 需要原图，请在提取页体验。",
     useLast: "使用刚才的嵌入结果",
     attackLabel: "攻击方式",
     types: {

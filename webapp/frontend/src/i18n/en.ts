@@ -67,6 +67,7 @@ export const en: Dict = {
   },
   attack: {
     intro: "Attack a watermarked image and see if the watermark survives.",
+    blindOnly: "The attack lab supports blind methods (DCT / DWT) only; DFT needs the original image — try it on the Extract tab.",
     useLast: "Use the result you just embedded",
     attackLabel: "Attack",
     types: {

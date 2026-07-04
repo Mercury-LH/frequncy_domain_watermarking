@@ -62,6 +62,7 @@ export default function AttackTab() {
     <div className="grid gap-8 lg:grid-cols-2">
       <div className="space-y-6">
         <p className="text-sm text-ink-muted">{t.attack.intro}</p>
+        <p className="text-sm text-ink-muted">{t.attack.blindOnly}</p>
         {lastEmbed && (
           <button
             type="button"
